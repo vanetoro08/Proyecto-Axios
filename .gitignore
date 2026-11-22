@@ -1,0 +1,10 @@
+.cpcache/
+.nrepl-port
+.lsp/
+.clj-kondo/.cache/
+target/
+*.db
+*.db-journal
+.DS_Store
+.idea/
+.vscode/
