@@ -7,13 +7,12 @@
 
  :aliases
  {;; Ejecutar la CLI:  clojure -M:run traducir "¿Cuándo vendrán ustedes?"
-  :run {:main-opts ["-m" "axios.core"]
-      :jvm-opts ["-Dfile.encoding=UTF-8"
-                 "-Dstdout.encoding=UTF-8"
-                 "-Dstderr.encoding=UTF-8"]}
+  :run  {:main-opts ["-m" "axios.core"]
+         :jvm-opts  ["-Dfile.encoding=UTF-8" "-Dstdout.encoding=UTF-8" "-Dstderr.encoding=UTF-8"
+                     "--enable-native-access=ALL-UNNAMED"]}
 
-  ;; Correr las pruebas:  clojure -X:test
   :test {:extra-paths ["test"]
+         :jvm-opts    ["-Dfile.encoding=UTF-8" "--enable-native-access=ALL-UNNAMED"]
          :extra-deps  {io.github.cognitect-labs/test-runner
                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
          :exec-fn     cognitect.test-runner.api/test}}}
