@@ -1,0 +1,23 @@
+;; Pares de prueba: pregunta en español → traducción esperada.
+;; Responsable: Jhojan (PP-24). Meta: 30 o más.
+;;
+;; Formato de cada par:
+;;   {:id       "P01"
+;;    :espanol  "pregunta tal como llegaría"
+;;    :kethari  "traducción esperada"   ; nil = se espera que NO se traduzca
+;;    :ozh      "traducción esperada"
+;;    :cubre    #{:futuro :pregunta-abierta ...}   ; qué caso prueba
+;;    :nota     "de dónde sale la respuesta esperada (señal, regla del manual, decisión D-00X)"}
+;;
+;; Casos que deben quedar cubiertos (sección 5.4 del enunciado):
+;;   preguntas sí/no · qué · cuándo · dónde · cuántos · quién · afirmaciones cortas
+;;   pasado · presente · futuro · "ir a" · negación · plurales · posesivos
+;;   números en cifras y en letras (hasta 9.999) · sujeto omitido
+;;   sin tildes · sin signos · con errores de escritura · palabra desconocida
+
+[{:id      "P01"
+  :espanol "¿Cuando vendran ustedes?"
+  :kethari "kom ulesh vinime ka"
+  :ozh     "venu ʔasur mar shavi wem"
+  :cubre   #{:pregunta-abierta :cuando :futuro :sin-tildes}
+  :nota    "Kethari = señal día 5. Ozh: regla de futuro (venu) + pregunta (ʔa-) + partícula mar (decisión pendiente PP-23)."}]
