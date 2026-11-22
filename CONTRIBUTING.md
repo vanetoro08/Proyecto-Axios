@@ -36,6 +36,16 @@ git push -u origin feature/PP-13-afd
    | `chore` | Configuración, dependencias, estructura | `chore(PP-8): esqueleto del proyecto` |
 
    Descripción en minúscula, en presente y corta.
+2. **Commits pequeños y seguidos**, no uno gigante al final. El historial de Git se califica.
+3. **No tocar el código de otra fase** sin avisar a su responsable.
+4. **No cambiar `docs/contratos.md`** sin avisar en el grupo y anotarlo en la bitácora.
+5. **Toda decisión que el enunciado no resuelve va a `docs/bitacora.md`** el mismo día, con su prueba.
+6. **Nada de léxico ni de reglas en el código**: todo sale de la BD.
+7. **Expresiones regulares solo en `normalizador.clj`.** Ojo con las que no parecen: además de
+   `#"..."`, `re-find`, `re-matches` y `re-seq`, también cuentan `str/split` y `str/replace` con
+   un patrón `#"..."`, y el `.split` de Java. Para cortar las líneas de señales en cada `|`,
+   usen una función propia que recorra el texto (PP-30).
+8. Antes de abrir el pull request, correr `clojure -X:test`.
 
 ## Restricciones del enunciado (revisar antes del release, PP-40)
 
