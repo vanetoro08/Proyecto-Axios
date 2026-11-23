@@ -1,23 +1,294 @@
 ;; Pares de prueba: pregunta en español → traducción esperada.
-;; Responsable: Jhojan (PP-24). Meta: 30 o más.
+;; Responsable: Jhojan (PP-24). Total: 40 pares (35 válidos + 5 de rechazo controlado).
 ;;
 ;; Formato de cada par:
 ;;   {:id       "P01"
 ;;    :espanol  "pregunta tal como llegaría"
-;;    :kethari  "traducción esperada"   ; nil = se espera que NO se traduzca
+;;    :kethari  "traducción esperada"   ; nil = se espera que NO se traduzca (D-009)
 ;;    :ozh      "traducción esperada"
-;;    :cubre    #{:futuro :pregunta-abierta ...}   ; qué caso prueba
-;;    :nota     "de dónde sale la respuesta esperada (señal, regla del manual, decisión D-00X)"}
+;;    :cubre    #{:futuro :pregunta-abierta ...}
+;;    :nota     "respaldo: señal, regla del manual o decisión de bitácora D-00X"}
 ;;
-;; Casos que deben quedar cubiertos (sección 5.4 del enunciado):
-;;   preguntas sí/no · qué · cuándo · dónde · cuántos · quién · afirmaciones cortas
-;;   pasado · presente · futuro · "ir a" · negación · plurales · posesivos
-;;   números en cifras y en letras (hasta 9.999) · sujeto omitido
-;;   sin tildes · sin signos · con errores de escritura · palabra desconocida
+;; Alineado a Bitácora D-001..D-016 y sección 5.4 del enunciado.
 
 [{:id      "P01"
   :espanol "¿Cuando vendran ustedes?"
   :kethari "kom ulesh vinime ka"
   :ozh     "venu ʔasur mar shavi wem"
   :cubre   #{:pregunta-abierta :cuando :futuro :sin-tildes}
-  :nota    "Kethari = señal día 5. Ozh: regla de futuro (venu) + pregunta (ʔa-) + partícula mar (decisión pendiente PP-23)."}]
+  :nota    "Kethari = señal día 5. Ozh: futuro (venu) + pregunta (ʔa) + partícula mar (D-008)."}
+
+ {:id      "P02"
+  :espanol "Queremos paz"
+  :kethari "anul parn thal"
+  :ozh     "lom mar ʔenka ilu"
+  :cubre   #{:afirmacion :presente :sujeto-omitido}
+  :nota    "Kethari = señal día 2 (anul en presente, D-004). Ozh: participantes en presente → mar (D-016)."}
+
+ {:id      "P03"
+  :espanol "Nosotros enviamos mensajes"
+  :kethari "anul ombraesh sal"
+  :ozh     "dra mar ʔenka vesh"
+  :cubre   #{:afirmacion :presente :plural :aviso-d015}
+  :nota    "Verbo -ar en 1.ª persona plural: presente por defecto con aviso (D-015), anul (D-004) y mar (D-016)."}
+
+ {:id      "P04"
+  :espanol "Quince naves llegaron"
+  :kethari "ra-sel kumesh vinok"
+  :ozh     "ʔoka sur zi ois-ulo gor"
+  :cubre   #{:afirmacion :pasado :numero-en-letras :plural :base-6}
+  :nota    "Kethari = señal día 3 (15 en base 6 = ra-sel, D-007). Ozh: pasado → zi (D-016)."}
+
+ {:id      "P05"
+  :espanol "Llegarán quince naves"
+  :kethari "ra-sel kumesh vinime"
+  :ozh     "venu sur tho ois-ulo gor"
+  :cubre   #{:afirmacion :futuro :numero-en-letras :plural}
+  :nota    "Ozh = señal día 3 (futuro sobre terceros → tho, D-016)."}
+
+ {:id      "P06"
+  :espanol "Nosotros esperaremos seis ciclos"
+  :kethari "anul ti-vo lunesh tepime"
+  :ozh     "venu bo mar ʔenka sab drüm"
+  :cubre   #{:afirmacion :futuro :numero-en-letras :base-6}
+  :nota    "Kethari = señal día 7 (6 en base 6 = ti-vo, D-007; futuro → anul, D-004). Ozh: mar (D-016)."}
+
+ {:id      "P07"
+  :espanol "Vamos a esperar seis ciclos"
+  :kethari "anul ti-vo lunesh tepime"
+  :ozh     "venu bo mar ʔenka sab drüm"
+  :cubre   #{:afirmacion :futuro-ir-a :sujeto-omitido :numero-en-letras}
+  :nota    "Perífrasis 'ir a + infinitivo' tratada como futuro (sección 5.4)."}
+
+ {:id      "P08"
+  :espanol "Yo espero seis ciclos"
+  :kethari "an ti-vo lunesh tep"
+  :ozh     "bo mar ʔen sab drüm"
+  :cubre   #{:afirmacion :presente :numero-en-letras}
+  :nota    "Ozh = señal día 7 (presente participantes → mar, D-016)."}
+
+ {:id      "P09"
+  :espanol "Ellos quieren paz"
+  :kethari "iresh parn thal"
+  :ozh     "lom tho oruvi ilu"
+  :cubre   #{:afirmacion :presente}
+  :nota    "Ozh = señal día 2 (presente terceros → tho, D-016)."}
+
+ {:id      "P10"
+  :espanol "Yo quiero agua"
+  :kethari "an dahl thal"
+  :ozh     "lom mar ʔen naʔ"
+  :cubre   #{:afirmacion :presente}
+  :nota    "Kethari = ejemplo manual 3.3. Ozh: presente participantes → mar (D-016)."}
+
+ {:id      "P11"
+  :espanol "Visitaremos tu planeta"
+  :kethari "anul ul vael dunime"
+  :ozh     "venu kesh mar ʔenka thüm sha"
+  :cubre   #{:afirmacion :futuro :sujeto-omitido :posesivo}
+  :nota    "Poseedor delante en Kethari (ul vael) y detrás en Ozh (thüm sha)."}
+
+ {:id      "P12"
+  :espanol "Ellos van a visitar nuestro mundo"
+  :kethari "iresh anul vael dunime"
+  :ozh     "venu kesh tho oruvi thüm ʔenka"
+  :cubre   #{:afirmacion :futuro-ir-a :posesivo}
+  :nota    "Poseedor 'nuestro' en futuro → anul (D-004); mundo → vael/thüm (D-005)."}
+
+ {:id      "P13"
+  :espanol "Ellos visitaron nuestro mundo"
+  :kethari "iresh anir vael dunok"
+  :ozh     "ʔoka kesh zi oruvi thüm ʔenka"
+  :cubre   #{:afirmacion :pasado :posesivo}
+  :nota    "Kethari = prueba D-004 (poseedor 'nuestro' en pasado → anir). Ozh = señal día 8."}
+
+ {:id      "P14"
+  :espanol "Ustedes no hablan"
+  :kethari "ulesh nular"
+  :ozh     "ne tal mar shavi"
+  :cubre   #{:afirmacion :negacion :presente}
+  :nota    "Ozh = señal día 6. Kethari: prefijo nu- en el verbo."}
+
+ {:id      "P15"
+  :espanol "Ellos no quieren paz"
+  :kethari "iresh parn nuthal"
+  :ozh     "ne lom tho oruvi ilu"
+  :cubre   #{:afirmacion :negacion :presente}
+  :nota    "Ozh = señal día 10."}
+
+ {:id      "P16"
+  :espanol "No vimos naves"
+  :kethari "anir kumesh nukorok"
+  :ozh     "ʔoka ne ʔim zi ʔenka gor"
+  :cubre   #{:afirmacion :negacion :pasado :sujeto-omitido :plural}
+  :nota    "Prueba D-012 (pasado negado en Ozh con ʔoka + ne) y D-004 (anir en pasado)."}
+
+ {:id      "P17"
+  :espanol "Yo no voy a esperar"
+  :kethari "an nutepime"
+  :ozh     "venu ne bo mar ʔen"
+  :cubre   #{:afirmacion :negacion :futuro-ir-a}
+  :nota    "Negación + futuro perifrástico 'ir a'."}
+
+ {:id      "P18"
+  :espanol "Él no escucha el mensaje"
+  :kethari "ir ombra nurhu"
+  :ozh     "ne nem tho oru vesh"
+  :cubre   #{:afirmacion :negacion :presente}
+  :nota    "Artículo 'el' omitido (manual 3.3/3.4); terceros → tho (D-016)."}
+
+ {:id      "P19"
+  :espanol "¿Quieren paz?"
+  :kethari "ulesh parn thal ka"
+  :ozh     "ʔalom mar shavi ilu"
+  :cubre   #{:pregunta-si-no :sujeto-omitido :aviso-d010}
+  :nota    "Sujeto omitido en pregunta → ustedes con aviso (D-010); partícula mar (D-008)."}
+
+ {:id      "P20"
+  :espanol "¿Es él una criatura?"
+  :kethari "ir yorr mi ka"
+  :ozh     "ʔaha mar oru fen"
+  :cubre   #{:pregunta-si-no :articulo-omitido}
+  :nota    "Kethari = señal día 9; artículo 'una' omitido (D-011)."}
+
+ {:id      "P21"
+  :espanol "¿Escuchas nuestro mensaje?"
+  :kethari "ul anul ombra rhu ka"
+  :ozh     "ʔanem mar sha vesh ʔenka"
+  :cubre   #{:pregunta-si-no :sujeto-omitido :posesivo}
+  :nota    "2.ª persona singular deducida del verbo sin ambigüedad."}
+
+ {:id      "P22"
+  :espanol "¿No vienen ustedes?"
+  :kethari "ulesh nuvin ka"
+  :ozh     "ne ʔasur mar shavi"
+  :cubre   #{:pregunta-si-no :negacion}
+  :nota    "Pregunta de sí o no negada."}
+
+ {:id      "P23"
+  :espanol "¿Ven ustedes la nave?"
+  :kethari "ulesh kum kor ka"
+  :ozh     "ʔaʔim mar shavi gor"
+  :cubre   #{:pregunta-si-no :prefijo-glotal}
+  :nota    "Prueba D-008: el prefijo ʔa- se aplica igual aunque el verbo empiece por ʔ (ʔaʔim)."}
+
+ {:id      "P24"
+  :espanol "¿Cuándo llegan?"
+  :kethari "kom ulesh vin ka"
+  :ozh     "ʔasur mar shavi wem"
+  :cubre   #{:pregunta-abierta :cuando :sujeto-omitido :aviso-d010}
+  :nota    "Ejemplo sección 5.4 y prueba D-010; Ozh = señal día 5."}
+
+ {:id      "P25"
+  :espanol "¿Quién envió el mensaje?"
+  :kethari "sem ombra salok ka"
+  :ozh     "ʔoka ʔadra mar vesh wis"
+  :cubre   #{:pregunta-abierta :quien :pasado}
+  :nota    "Kethari = señal día 6. Ozh: interrogativa wis al final."}
+
+ {:id      "P26"
+  :espanol "¿A quién escuchan ustedes?"
+  :kethari "sem ulesh rhu ka"
+  :ozh     "ʔanem tho shavi wis"
+  :cubre   #{:pregunta-abierta :quien :preposicion-a}
+  :nota    "Ozh = señal día 9 (copia partícula tho por D-008); 'a' de persona absorbida (D-014)."}
+
+ {:id      "P27"
+  :espanol "¿Qué quieren ellos?"
+  :kethari "kel iresh thal ka"
+  :ozh     "ʔalom mar oruvi wu"
+  :cubre   #{:pregunta-abierta :que}
+  :nota    "Interrogativa al inicio en Kethari (kel) y al final en Ozh (wu)."}
+
+ {:id      "P28"
+  :espanol "¿Dónde está su planeta?"
+  :kethari "dor ulesh vael mi ka"
+  :ozh     "ʔaha mar thüm shavi wor"
+  :cubre   #{:pregunta-abierta :donde :posesivo :aviso-d010}
+  :nota    "Prueba D-008 y D-010 ('su' en pregunta → de ustedes con aviso)."}
+
+ {:id      "P29"
+  :espanol "¿Cuántas naves llegaron?"
+  :kethari "kai kumesh vinok ka"
+  :ozh     "ʔoka ʔasur mar gor wak"
+  :cubre   #{:pregunta-abierta :cuantos :pasado :plural}
+  :nota    "Pregunta de cantidad con kai + plural -esh (D-019) y wak al final."}
+
+ {:id      "P30"
+  :espanol "¿Quieren una nave?"
+  :kethari "ulesh kum thal ka"
+  :ozh     "ʔalom mar shavi gor"
+  :cubre   #{:pregunta-si-no :articulo-omitido}
+  :nota    "Prueba D-011: 'una' se omite como artículo indefinido (sin ti/ois)."}
+
+ {:id      "P31"
+  :espanol "¿Quieren 1 nave?"
+  :kethari "ulesh ti kum thal ka"
+  :ozh     "ʔalom mar shavi ois gor"
+  :cubre   #{:pregunta-si-no :numero-cifras}
+  :nota    "Prueba D-011: '1' sí se traduce como número (ti/ois) con sustantivo singular (D-019)."}
+
+ {:id      "P32"
+  :espanol "¿Cuándo llegan sus quince naves?"
+  :kethari "kom ulesh ra-sel kumesh vin ka"
+  :ozh     "ʔasur mar ois-ulo gor shavi wem"
+  :cubre   #{:pregunta-abierta :cuando :posesivo :numero-en-letras :plural}
+  :nota    "Prueba D-013: poseedor, luego número, luego sustantivo en Kethari."}
+
+ {:id      "P33"
+  :espanol "Nosotros vimos veintiséis estrellas"
+  :kethari "anir mok-ra sorinesh korok"
+  :ozh     "ʔoka ʔim zi ʔenka dav-sab ral"
+  :cubre   #{:afirmacion :pasado :numero-en-letras :base-6}
+  :nota    "Kethari = señal día 10 (26 en base 6 = mok-ra, D-007; pasado → anir, D-004)."}
+
+ {:id      "P34"
+  :espanol "Esperaremos dos mil quince ciclos"
+  :kethari "anul ti-sel-ti-pai-pai lunesh tepime"
+  :ozh     "venu bo mar ʔenka dav-zu-ois-ulo drüm"
+  :cubre   #{:afirmacion :futuro :numero-en-letras :base-6}
+  :nota    "Ejemplo de número grande en letras de la sección 5.3 (2015 = 13155 en base 6)."}
+
+ {:id      "P35"
+  :espanol "Vimos 9999 estrellas"
+  :kethari "anir ti-ti-mok-ti-mok-sel sorinesh korok"
+  :ozh     "ʔoka ʔim zi ʔenka hev-hev-hev-hev ral"
+  :cubre   #{:afirmacion :pasado :numero-cifras :limite-9999 :base-6}
+  :nota    "Límite máximo 9.999 (prueba D-007: 114143 en base 6 = ti-ti-mok-ti-mok-sel)."}
+
+ {:id      "P36"
+  :espanol "vienen ustedes"
+  :kethari "ulesh vin"
+  :ozh     "sur mar shavi"
+  :cubre   #{:afirmacion :sin-signos :aviso-d006}
+  :nota    "Prueba D-006: sin signos ni interrogativa se interpreta como afirmación con aviso."}
+
+ {:id      "P37"
+  :espanol "quien envio el mensage"
+  :kethari "sem ombra salok ka"
+  :ozh     "ʔoka ʔadra mar vesh wis"
+  :cubre   #{:pregunta-abierta :quien :sin-tildes :sin-signos :error-ortografico}
+  :nota    "Combina falta de tildes (D-003), falta de signos y corrección Levenshtein ('mensage' → 'mensaje')."}
+
+ ;; --- Casos de rechazo controlado (PP-27, PP-28, D-009, D-014) ---
+
+ {:id      "P38"
+  :espanol "¿Traen armas?"
+  :kethari nil
+  :ozh     nil
+  :cubre   #{:palabra-desconocida :rechazo}
+  :nota    "Palabras sin respaldo en el manual ni en señales; se retiene y explica (condición 3, PP-27)."}
+
+ {:id      "P39"
+  :espanol "¿Están en su planeta?"
+  :kethari nil
+  :ozh     nil
+  :cubre   #{:palabra-desconocida :rechazo}
+  :nota    "Prueba D-014: la preposición 'en' no tiene equivalente en Kethari ni en Ozh."}
+
+ {:id      "P40"
+  :espanol "¿Cuál es su planeta?"
+  :kethari nil
+  :ozh     nil
+  :cubre   #{:palabra-desconocida :rechazo}
+  :nota    "Prueba D-014: 'cuál' no tiene equivalente en el manual."}]
