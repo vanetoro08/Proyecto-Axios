@@ -84,9 +84,9 @@
     (is (contains? (tipos-error (vo/validar "nesur tho shavi")) :morfologia-invalida))
     (is (contains? (tipos-error (vo/validar "dra ne zi ʔenka vesh")) :sin-particula)))
 
-  (testing "Sustantivos con plural prohibido en Ozh"
-    (is (contains? (tipos-error (vo/validar "venu sur tho ois-ulo goresh")) :plural-no-permitido))
-    (is (contains? (tipos-error (vo/validar "lom mar ʔen thümesh")) :plural-no-permitido)))
+  (testing "Sustantivos con plural no reconocido en Ozh"
+    (is (contains? (tipos-error (vo/validar "venu sur tho ois-ulo goresh")) :palabra-desconocida))
+    (is (contains? (tipos-error (vo/validar "lom mar ʔen thümesh")) :palabra-desconocida)))
 
   (testing "Preguntas sin prefijo ʔa o interrogativa fuera del final"
     (is (contains? (tipos-error (vo/validar "sur mar shavi wem")) :sin-prefijo-pregunta))

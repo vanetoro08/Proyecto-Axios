@@ -154,9 +154,9 @@
  {:id      "P21"
   :espanol "¿Escuchas nuestro mensaje?"
   :kethari "ul anul ombra rhu ka"
-  :ozh     "ʔanem mar sha vesh ʔenka"
+  :ozh     "ʔanem tho sha vesh ʔenka"
   :cubre   #{:pregunta-si-no :sujeto-omitido :posesivo}
-  :nota    "2.ª persona singular deducida del verbo sin ambigüedad."}
+  :nota    "2.ª persona singular deducida del verbo; Ozh copia partícula tho del día 9 por mismo verbo nem (D-008)."}
 
  {:id      "P22"
   :espanol "¿No vienen ustedes?"
@@ -182,9 +182,9 @@
  {:id      "P25"
   :espanol "¿Quién envió el mensaje?"
   :kethari "sem ombra salok ka"
-  :ozh     "ʔoka ʔadra mar vesh wis"
+  :ozh     "ʔoka ʔadra tho vesh wis"
   :cubre   #{:pregunta-abierta :quien :pasado}
-  :nota    "Kethari = señal día 6. Ozh: interrogativa wis al final."}
+  :nota    "Kethari = señal día 6. Ozh: copia partícula tho del día 9 por mismo interrogativo wis (D-008)."}
 
  {:id      "P26"
   :espanol "¿A quién escuchan ustedes?"
@@ -266,9 +266,9 @@
  {:id      "P37"
   :espanol "quien envio el mensage"
   :kethari "sem ombra salok ka"
-  :ozh     "ʔoka ʔadra mar vesh wis"
+  :ozh     "ʔoka ʔadra tho vesh wis"
   :cubre   #{:pregunta-abierta :quien :sin-tildes :sin-signos :error-ortografico}
-  :nota    "Combina falta de tildes (D-003), falta de signos y corrección Levenshtein ('mensage' → 'mensaje')."}
+  :nota    "Sin tildes (D-003), sin signos y corrección Levenshtein ('mensage' → 'mensaje'); Ozh usa tho por wis (D-008)."}
 
  ;; --- Casos de rechazo controlado (PP-27, PP-28, D-009, D-014) ---
 
