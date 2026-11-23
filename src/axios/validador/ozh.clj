@@ -20,10 +20,11 @@
 (defn- analizar-numero
   [lexema formas reglas]
   (let [digitos (:digito formas)
-        sep (first (or (lexer/obtener-regla reglas :numeros.separador) "-"))
+        sep-str (lexer/obtener-regla reglas :numeros.separador)
+        sep (when (seq sep-str) (first sep-str))
         base (lexer/parse-entero (lexer/obtener-regla reglas :numeros.base) 10)
         maximo 9999
-        partes (lexer/dividir-por-caracter lexema sep)
+        partes (if sep (lexer/dividir-por-caracter lexema sep) [lexema])
         tiene-sep? (> (count partes) 1)]
     (cond
       (and (seq digitos) (every? #(contains? digitos %) partes))
@@ -63,26 +64,17 @@
 
 (defn- diagnosticar-morfologia-invalida
   [lexema formas reglas]
-  (let [susts (:sustantivo formas)
-        verbos (:verbo formas)
+  (let [verbos (:verbo formas)
         pref-preg (lexer/obtener-regla reglas :prefijo.pregunta)
         neg (lexer/obtener-regla reglas :negacion)]
     (cond
-      ;; Sustantivo Ozh con marca plural (en Ozh regla :plural = "no")
-      (and (= "no" (lexer/obtener-regla reglas :plural))
-           (some #(and (lexer/termina-con? lexema %)
-                       (contains? susts (lexer/quitar-sufijo lexema %)))
-                 ["esh" "s"]))
-      (err :plural-no-permitido
-           (str "Sustantivo Ozh inválido '" lexema "': en Ozh los sustantivos no llevan marca de plural."))
-
       ;; Doble prefijo interrogativo (ej. ʔaʔasur)
       (and (lexer/empieza-con? lexema (str pref-preg pref-preg))
            (contains? verbos (lexer/quitar-prefijo lexema (str pref-preg pref-preg))))
       (err :morfologia-invalida
            (str "Verbo Ozh inválido '" lexema "': prefijo interrogativo '" pref-preg "' duplicado."))
 
-      ;; Negación pegada al verbo (en Ozh 'ne' es palabra separada)
+      ;; Negación pegada al verbo (en Ozh la negación es palabra separada)
       (and (seq neg)
            (lexer/empieza-con? lexema neg)
            (contains? verbos (lexer/quitar-prefijo lexema neg)))

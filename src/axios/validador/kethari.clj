@@ -19,10 +19,11 @@
 (defn- analizar-numero
   [lexema formas reglas]
   (let [digitos (:digito formas)
-        sep (first (or (lexer/obtener-regla reglas :numeros.separador) "-"))
+        sep-str (lexer/obtener-regla reglas :numeros.separador)
+        sep (when (seq sep-str) (first sep-str))
         base (lexer/parse-entero (lexer/obtener-regla reglas :numeros.base) 6)
         maximo 9999
-        partes (lexer/dividir-por-caracter lexema sep)
+        partes (if sep (lexer/dividir-por-caracter lexema sep) [lexema])
         tiene-sep? (> (count partes) 1)]
     (cond
       (and (seq digitos) (every? #(contains? digitos %) partes))
