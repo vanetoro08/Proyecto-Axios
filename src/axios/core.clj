@@ -57,6 +57,22 @@
       (catch clojure.lang.ExceptionInfo e
         (println (ex-message e))))))
 
+(defn- mostrar-historial
+  "Orden historial: cada pregunta con su estado y su traducción o su explicación."
+  [desde]
+  (let [preguntas (bd/historial desde)]
+    (if (empty? preguntas)
+      (println (if desde (str "No hay preguntas desde " desde ".") "Todavía no hay preguntas registradas."))
+      (doseq [r preguntas]
+        (println (str "#" (:id r) "  " (:fecha r) "  " (name (:estado r))))
+        (println "  Pregunta:" (:original r))
+        (if (= :aprobada (:estado r))
+          (do (println "  Kethari: " (get-in r [:traducciones :kethari :texto]))
+              (println "  Ozh:     " (get-in r [:traducciones :ozh :texto])))
+          (println "  No se transmitió:" (:explicacion r)))
+        (doseq [aviso (:avisos r)]
+          (println "  Aviso:" aviso))))))
+
 (defn ejecutar
   "Interpreta los argumentos y ejecuta la orden. Separado de -main para poder probarlo."
   [args]
@@ -68,8 +84,7 @@
                     (mostrar-resultado r))
       "cargar"    (mostrar-carga (first resto))
       "historial" (let [[_ fecha] resto]               ; historial desde 2026-11-21
-                    (doseq [r (bd/historial fecha)]
-                      (println (:id r) (:fecha r) (name (:estado r)) "-" (:original r))))
+                    (mostrar-historial fecha))
       "palabra"   (let [[termino _ fecha] resto]       ; palabra vael en 2026-11-21
                     (pp/pprint (bd/palabra-info termino fecha)))
       (println uso))))
