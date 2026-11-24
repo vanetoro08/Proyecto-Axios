@@ -66,39 +66,24 @@ VALUES ('imos', 'er', 'pasado', 1, 'plural');
 INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
 VALUES ('ieron', 'er', 'pasado', 3, 'plural');
 
--- Futuro (mismas terminaciones para todas las conjugaciones)
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('e', 'ar', 'futuro', 1, 'singular');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('as', 'ar', 'futuro', 2, 'singular');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('a', 'ar', 'futuro', 3, 'singular');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('emos', 'ar', 'futuro', 1, 'plural');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('an', 'ar', 'futuro', 3, 'plural');
+-- Futuro 
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('are', 'ar', 'futuro', 1, 'singular');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('aras', 'ar', 'futuro', 2, 'singular');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('ara', 'ar', 'futuro', 3, 'singular');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('aremos', 'ar', 'futuro', 1, 'plural');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('aran', 'ar', 'futuro', 3, 'plural');
 
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('e', 'er', 'futuro', 1, 'singular');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('as', 'er', 'futuro', 2, 'singular');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('a', 'er', 'futuro', 3, 'singular');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('emos', 'er', 'futuro', 1, 'plural');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('an', 'er', 'futuro', 3, 'plural');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('ere', 'er', 'futuro', 1, 'singular');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('eras', 'er', 'futuro', 2, 'singular');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('era', 'er', 'futuro', 3, 'singular');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('eremos', 'er', 'futuro', 1, 'plural');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('eran', 'er', 'futuro', 3, 'plural');
 
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('e', 'ir', 'futuro', 1, 'singular');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('as', 'ir', 'futuro', 2, 'singular');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('a', 'ir', 'futuro', 3, 'singular');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('emos', 'ir', 'futuro', 1, 'plural');
-INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) 
-VALUES ('an', 'ir', 'futuro', 3, 'plural');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('ire', 'ir', 'futuro', 1, 'singular');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('iras', 'ir', 'futuro', 2, 'singular');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('ira', 'ir', 'futuro', 3, 'singular');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('iremos', 'ir', 'futuro', 1, 'plural');
+INSERT INTO morfologia_es (terminacion, conjugacion, tiempo, persona, numero) VALUES ('iran', 'ir', 'futuro', 3, 'plural');
 
 -- ============================================================
 -- VERBOS IRREGULARES (del vocabulario y de las señales)
