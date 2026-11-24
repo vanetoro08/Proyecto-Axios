@@ -334,3 +334,27 @@ INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde)
 VALUES ((SELECT id FROM concepto WHERE clave = 'ser'), 'es', 'fue', 7, '2026-11-23');
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) 
 VALUES ((SELECT id FROM concepto WHERE clave = 'ser'), 'es', 'fueron', 7, '2026-11-23');
+
+-- ============================================================
+-- PLURALES Y CONJUGACIONES FALTANTES (Corrección de revisión)
+-- ============================================================
+
+-- Plurales de sustantivos
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'nave'), 'es', 'naves', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'planeta'), 'es', 'planetas', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'estrella'), 'es', 'estrellas', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'tierra'), 'es', 'tierras', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'agua'), 'es', 'aguas', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'mensaje'), 'es', 'mensajes', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'ciclo'), 'es', 'ciclos', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'ano'), 'es', 'anos', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'luz'), 'es', 'luces', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'criatura'), 'es', 'criaturas', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'hogar'), 'es', 'hogares', 7, '2026-11-23');
+
+-- Conjugaciones de "venir" (llegar) que faltaban
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llegan', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llegaron', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llegar', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llega', 7, '2026-11-23');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llego', 7, '2026-11-23');
