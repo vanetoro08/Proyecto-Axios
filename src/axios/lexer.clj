@@ -1,23 +1,61 @@
 (ns axios.lexer
-  "Fase 2. Analizador léxico: autómata finito determinista escrito a mano
-  (contratos.md, sección 2).
-  Responsable: Luisa (PP-13).
+  "Analizador Léxico (AFD hecho a mano) para el español (PP-13).
+  Contrato: (tokenizar texto) → [{:tipo :palabra :lexema \"...\" :pos {:inicio 0 :fin 5}} ...]
+  Responsable: Luisa (E1).
+  Nota: Recibe el :texto del normalizador, por lo que ya viene en minúsculas y sin tildes."
+  (:require [clojure.string :as str]))
 
-  Sin regex ni librerías: el AFD recorre el texto carácter por carácter.
-  El diagrama de estados va en docs/memoria.md.")
+(defn- es-letra? [c]
+  ;; El texto ya viene normalizado (sin tildes, ñ convertida a n).
+  ;; Pero por seguridad aceptamos la ñ y vocales acentuadas por si acaso.
+  (boolean (re-matches #"[a-zñáéíóúü]" (str c))))
 
-;; ---------------------------------------------------------------------------
-;; STUB — devuelve siempre los tokens de \"¿cuando vendran ustedes?\".
-;; Reemplazar por el AFD real en PP-13.
-;; ---------------------------------------------------------------------------
+(defn- es-digito? [c]
+  (boolean (re-matches #"[0-9]" (str c))))
 
-(defn tokenizar
-  "Recibe el :texto del normalizador y devuelve un vector de tokens
-  {:tipo :palabra|:numero|:signo :lexema \"...\" :pos {:inicio n :fin n}}.
-  Los :numero llevan además :valor."
-  [_texto]
-  [{:tipo :signo   :lexema "¿"       :pos {:inicio 0  :fin 1}}
-   {:tipo :palabra :lexema "cuando"  :pos {:inicio 1  :fin 7}}
-   {:tipo :palabra :lexema "vendran" :pos {:inicio 8  :fin 15}}
-   {:tipo :palabra :lexema "ustedes" :pos {:inicio 16 :fin 23}}
-   {:tipo :signo   :lexema "?"       :pos {:inicio 23 :fin 24}}])
+(def signos #{\¿ \? \¡ \! \. \,})
+
+(defn tokenizar [texto]
+  (let [n (count texto)]
+    (loop [i 0
+           tokens []]
+      (if (>= i n)
+        tokens
+        (let [c (nth texto i)]
+          (cond
+            ;; 1. Ignorar espacios en blanco
+            (Character/isWhitespace c)
+            (recur (inc i) tokens)
+
+            ;; 2. Estado de Palabra (letras)
+            (es-letra? c)
+            (let [j (loop [j i] 
+                      (if (and (< j n) (es-letra? (nth texto j))) 
+                        (recur (inc j)) 
+                        j))]
+              (recur j (conj tokens {:tipo :palabra 
+                                     :lexema (subs texto i j) 
+                                     :pos {:inicio i :fin j}})))
+
+            ;; 3. Estado de Número (dígitos)
+            (es-digito? c)
+            (let [j (loop [j i] 
+                      (if (and (< j n) (es-digito? (nth texto j))) 
+                        (recur (inc j)) 
+                        j))
+                  lexema (subs texto i j)]
+              (recur j (conj tokens {:tipo :numero 
+                                     :lexema lexema 
+                                     :valor (Integer/parseInt lexema) 
+                                     :pos {:inicio i :fin j}})))
+
+            ;; 4. Estado de Signo de puntuación permitido
+            (contains? signos c)
+            (recur (inc i) (conj tokens {:tipo :signo 
+                                         :lexema (str c) 
+                                         :pos {:inicio i :fin (inc i)}}))
+
+            ;; 5. Carácter inválido
+            :else
+            (throw (ex-info (str "Carácter inválido en el texto: '" c "'") 
+                            {:fase :lexer :pos i :caracter c}))))))))
