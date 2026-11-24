@@ -40,6 +40,23 @@
     (println "Aviso:" aviso))
   (println "Registrada con id" (:id r)))
 
+(defn- mostrar-carga
+  "Orden cargar (PP-30): resumen de lo que entró y de las líneas que no se entendieron."
+  [ruta]
+  (if (nil? ruta)
+    (println "Falta el archivo. Uso: cargar <archivo>")
+    (try
+      (let [{:keys [version senales correcciones repetidas errores]} (bd/cargar-archivo! ruta)]
+        (println (str "Archivo: " ruta (when version (str " (manual " version ")"))))
+        (println "Señales nuevas:      " senales)
+        (println "Correcciones nuevas: " correcciones)
+        (when (pos? repetidas)
+          (println "Ya estaban cargadas: " repetidas))
+        (doseq [{:keys [linea motivo]} errores]
+          (println (str "Línea " linea " no se cargó: " motivo))))
+      (catch clojure.lang.ExceptionInfo e
+        (println (ex-message e))))))
+
 (defn ejecutar
   "Interpreta los argumentos y ejecuta la orden. Separado de -main para poder probarlo."
   [args]
@@ -49,7 +66,7 @@
                         r (pipeline/traducir pregunta)]
                     (when (some #{"--traza"} opciones) (mostrar-traza r))
                     (mostrar-resultado r))
-      "cargar"    (pp/pprint (bd/cargar-archivo! (first resto)))
+      "cargar"    (mostrar-carga (first resto))
       "historial" (let [[_ fecha] resto]               ; historial desde 2026-11-21
                     (doseq [r (bd/historial fecha)]
                       (println (:id r) (:fecha r) (name (:estado r)) "-" (:original r))))

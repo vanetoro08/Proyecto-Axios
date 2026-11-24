@@ -15,12 +15,13 @@
 ;; Conexión
 ;; ---------------------------------------------------------------------------
 
-(def ^:private ruta-bd
-  "Archivo de la BD, en la carpeta desde donde se ejecuta el programa."
+(def ^:dynamic *ruta-bd*
+  "Archivo de la BD, en la carpeta desde donde se ejecuta el programa.
+  Las pruebas lo cambian con binding para trabajar en una BD aparte."
   "axios.db")
 
 (defn- abrir ^Connection []
-  (let [c (DriverManager/getConnection (str "jdbc:sqlite:" ruta-bd))]
+  (let [c (DriverManager/getConnection (str "jdbc:sqlite:" *ruta-bd*))]
     (with-open [s (.createStatement c)]
       (.execute s "PRAGMA foreign_keys = ON"))
     c))
@@ -86,12 +87,16 @@
       (ejecutar-script! c "bd/morfologia.sql")
       (ejecutar-script! c "bd/vocabulario_es.sql"))))
 
-(defonce ^:private lista (delay (inicializar!)))
+(defonce ^:private inicializadas (atom #{}))
 
 (defn- conexion
   "Abre una conexión a la BD, inicializándola la primera vez."
   ^Connection []
-  @lista
+  (when-not (contains? @inicializadas *ruta-bd*)
+    (locking inicializadas
+      (when-not (contains? @inicializadas *ruta-bd*)
+        (inicializar!)
+        (swap! inicializadas conj *ruta-bd*))))
   (abrir))
 
 ;; ---------------------------------------------------------------------------
@@ -112,15 +117,47 @@
         (recur (conj filas (zipmap claves (map #(.getObject rs (int (inc %))) (range n)))))
         filas))))
 
+(defn- preparar [^Connection c sql params]
+  (let [ps (.prepareStatement c sql)]
+    (doseq [[i p] (map-indexed vector params)]
+      (.setObject ps (int (inc i)) p))
+    ps))
+
+(defn- consultar-en
+  "SELECT dentro de una conexión abierta (para usarlo en una transacción)."
+  [^Connection c sql & params]
+  (with-open [ps (preparar c sql params)
+              rs (.executeQuery ps)]
+    (leer-filas rs)))
+
+(defn- ejecutar-en!
+  "INSERT o UPDATE dentro de una conexión abierta. Devuelve el id de la fila
+  insertada (en un UPDATE no se usa)."
+  [^Connection c sql & params]
+  (with-open [ps (preparar c sql params)]
+    (.executeUpdate ps))
+  (:id (first (consultar-en c "SELECT last_insert_rowid() AS id"))))
+
+(defn- en-transaccion
+  "Ejecuta (f conexion) en una sola transacción: o entra todo o no entra nada."
+  [f]
+  (with-open [c (conexion)]
+    (.setAutoCommit c false)
+    (try
+      (let [r (f c)]
+        (.commit c)
+        r)
+      (catch Exception e
+        (.rollback c)
+        (throw e))
+      (finally
+        (.setAutoCommit c true)))))
+
 (defn- consultar
   "Ejecuta un SELECT con parámetros (?) y devuelve una lista de mapas."
   [sql & params]
-  (with-open [c  (conexion)
-              ps (.prepareStatement c sql)]
-    (doseq [[i p] (map-indexed vector params)]
-      (.setObject ps (int (inc i)) p))
-    (with-open [rs (.executeQuery ps)]
-      (leer-filas rs))))
+  (with-open [c (conexion)]
+    (apply consultar-en c sql params)))
 
 ;; ---------------------------------------------------------------------------
 ;; Funciones del contrato
@@ -233,7 +270,187 @@
   [termino _fecha]
   {:termino termino :significados []})
 
+;; ---------------------------------------------------------------------------
+;; Orden `cargar` (PP-30, bitácora D-002)
+;; ---------------------------------------------------------------------------
+
+(defn- hoy
+  "Fecha de hoy como texto ISO, ej. \"2026-11-24\"."
+  []
+  (str (java.time.LocalDate/now)))
+
+(defn- partir-campos
+  "Parte una línea en sus campos separados por |. Se recorre carácter por
+  carácter porque fuera del normalizador no se usa regex (ni str/split)."
+  [linea]
+  (loop [cs (seq linea), actual [], campos []]
+    (if-let [c (first cs)]
+      (if (= c \|)
+        (recur (rest cs) [] (conj campos (str/trim (apply str actual))))
+        (recur (rest cs) (conj actual c) campos))
+      (conj campos (str/trim (apply str actual))))))
+
+(defn- sin-tildes
+  "Minúsculas, sin tildes y ñ → n, como guarda el vocabulario (D-003)."
+  [texto]
+  (->> (java.text.Normalizer/normalize (str/lower-case texto) java.text.Normalizer$Form/NFD)
+       (remove #(= (Character/getType ^char %) Character/NON_SPACING_MARK))
+       (apply str)))
+
+(defn- version-del-manual
+  "Lee la versión del encabezado: \"# senales_semana2.txt · Axios · manual versión 0.8\" → \"0.8\"."
+  [lineas]
+  (some (fn [l]
+          (when (str/starts-with? l "#")
+            (when-let [i (str/index-of l "versión")]
+              (let [v (str/trim (subs l (+ i (count "versión"))))]
+                (when-not (str/blank? v) v)))))
+        lineas))
+
+(defn- fuente-de-carga!
+  "Crea (una sola vez por carga) la fuente que respalda lo que entra del archivo."
+  [c fuentes tipo descripcion fecha]
+  (or (get @fuentes tipo)
+      (let [id (ejecutar-en! c "INSERT INTO fuente (tipo, descripcion, fecha) VALUES (?, ?, ?)"
+                             tipo descripcion fecha)]
+        (swap! fuentes assoc tipo id)
+        id)))
+
+(defn- cargar-senal!
+  "SENAL|dia|voz|transcripcion|salida → tabla senal. Si ya estaba, no la repite."
+  [c fuente-id [_ dia voz transcripcion salida]]
+  (let [dia (parse-long dia)
+        voz (str/lower-case voz)
+        transcripcion (when-not (str/blank? transcripcion) transcripcion)]
+    (cond
+      (nil? dia)
+      {:error "el día no es un número"}
+
+      (not (#{"kethari" "ozh" "desconocida"} voz))
+      {:error (str "voz desconocida '" voz "' (se espera kethari, ozh o desconocida)")}
+
+      (str/blank? salida)
+      {:error "falta la salida del decodificador"}
+
+      (seq (consultar-en c "SELECT id FROM senal
+                            WHERE dia = ? AND voz = ? AND transcripcion IS ? AND salida = ?"
+                         dia voz transcripcion salida))
+      {:repetida true}
+
+      :else
+      (do (ejecutar-en! c "INSERT INTO senal (dia, voz, transcripcion, salida, fuente_id)
+                           VALUES (?, ?, ?, ?, ?)"
+                        dia voz transcripcion salida (fuente-id))
+          {:senal true}))))
+
+(defn- concepto-de-significado
+  "El concepto al que corresponde un significado en español (\"territorio
+  reclamado\" → su fila de concepto), o nil."
+  [c significado]
+  (first (consultar-en c "SELECT co.id, co.clave, co.categoria
+                          FROM palabra p JOIN concepto co ON co.id = p.concepto_id
+                          WHERE p.lengua = 'es' AND p.forma = ? AND p.vigente_hasta IS NULL
+                          ORDER BY p.id"
+                       (sin-tildes significado))))
+
+(defn- crear-concepto!
+  "Significado nuevo que la BD no conocía: se crea el concepto (con la misma
+  categoría que el significado anterior) y su palabra en español."
+  [c significado categoria fuente-id fecha]
+  (let [forma (sin-tildes significado)
+        clave (str/replace forma " " "-")
+        id    (ejecutar-en! c "INSERT INTO concepto (clave, categoria) VALUES (?, ?)" clave categoria)]
+    (ejecutar-en! c "INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde)
+                     VALUES (?, 'es', ?, ?, ?)"
+                  id forma fuente-id fecha)
+    {:id id :clave clave :categoria categoria}))
+
+(defn- cargar-correccion!
+  "CORRECCION|lengua|palabra|anterior|nuevo: cierra la vigencia del significado
+  anterior con la fecha de carga y crea el nuevo desde esa misma fecha."
+  [c fuente-id fecha [_ lengua forma anterior nuevo]]
+  (let [lengua (str/lower-case lengua)
+        concepto-anterior (concepto-de-significado c anterior)
+        concepto-nuevo    (concepto-de-significado c nuevo)
+        vigente (fn [concepto]
+                  (when concepto
+                    (first (consultar-en c "SELECT id FROM palabra
+                                            WHERE lengua = ? AND forma = ? AND concepto_id = ?
+                                              AND vigente_hasta IS NULL"
+                                         lengua forma (:id concepto)))))]
+    (cond
+      (not (#{"kethari" "ozh"} lengua))
+      {:error (str "lengua desconocida '" lengua "' (se espera kethari u ozh)")}
+
+      (some str/blank? [forma anterior nuevo])
+      {:error "faltan datos: se espera CORRECCION|lengua|palabra|significado anterior|significado nuevo"}
+
+      (vigente concepto-nuevo)
+      {:repetida true}
+
+      (nil? (vigente concepto-anterior))
+      {:error (str "'" forma "' no significa '" anterior "' en " lengua " según la BD")}
+
+      :else
+      (let [fid (fuente-id)
+            nuevo (or concepto-nuevo
+                      (crear-concepto! c nuevo (:categoria concepto-anterior) fid fecha))]
+        (ejecutar-en! c "UPDATE palabra SET vigente_hasta = ? WHERE id = ?"
+                      fecha (:id (vigente concepto-anterior)))
+        (ejecutar-en! c "INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde)
+                         VALUES (?, ?, ?, ?, ?)"
+                      (:id nuevo) lengua forma fid fecha)
+        {:correccion true}))))
+
 (defn cargar-archivo!
-  "Incorpora un archivo de señales o de correcciones del manual. TODO PP-30."
-  [ruta]
-  {:archivo ruta :senales 0 :palabras-nuevas 0})
+  "Incorpora un archivo de señales o de correcciones del manual (D-002), sin
+  tocar el código. Cada línea dice su tipo en el primer campo:
+    SENAL|dia|voz|transcripcion|salida
+    CORRECCION|lengua|palabra|significado anterior|significado nuevo
+  Las líneas con # son comentarios. Una línea que no se entiende se reporta y
+  la carga sigue con las demás. Lo que ya estaba cargado no se repite.
+  Todo entra en una sola transacción y con la fecha de carga (por defecto, hoy).
+
+  Devuelve {:archivo :version :senales :correcciones :repetidas :errores}."
+  ([ruta] (cargar-archivo! ruta (hoy)))
+  ([ruta fecha]
+   (let [archivo (io/file ruta)]
+     (when-not (.isFile archivo)
+       (throw (ex-info (str "No existe el archivo '" ruta "'.")
+                       {:fase :cargar :tipo :archivo-no-encontrado :detalle {:ruta ruta}})))
+     (let [lineas  (with-open [r (io/reader archivo :encoding "UTF-8")] (vec (line-seq r)))
+           version (version-del-manual lineas)
+           nombre  (str (.getName archivo) (when version (str " (manual " version ")")))
+           fuentes (atom {})]
+       (en-transaccion
+        (fn [c]
+          (let [fuente-senal (fn [] (fuente-de-carga! c fuentes "senal"
+                                                      (str "Señales de " nombre) fecha))
+                fuente-corr  (fn [] (fuente-de-carga! c fuentes "correccion"
+                                                      (str "Correcciones de " nombre) fecha))
+                resultados
+                (for [[n linea] (map-indexed (fn [i l] [(inc i) (str/trim l)]) lineas)
+                      :when (not (or (str/blank? linea) (str/starts-with? linea "#")))]
+                  (let [campos (partir-campos linea)
+                        tipo   (str/upper-case (first campos))
+                        r (cond
+                            (not (#{"SENAL" "CORRECCION"} tipo))
+                            {:error (str "tipo desconocido '" (first campos) "'")}
+
+                            (not= 5 (count campos))
+                            {:error (str "se esperaban 5 campos y hay " (count campos))}
+
+                            (= "SENAL" tipo)
+                            (cargar-senal! c fuente-senal campos)
+
+                            :else
+                            (cargar-correccion! c fuente-corr fecha campos))]
+                    (assoc r :linea n)))
+                resultados (doall resultados)]
+            {:archivo      ruta
+             :version      version
+             :senales      (count (filter :senal resultados))
+             :correcciones (count (filter :correccion resultados))
+             :repetidas    (count (filter :repetida resultados))
+             :errores      (vec (for [r resultados :when (:error r)]
+                                  {:linea (:linea r) :motivo (:error r)}))})))))))
