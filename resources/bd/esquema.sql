@@ -2,12 +2,14 @@
 -- Basado en docs/contratos.md, sección "Base de datos".
 -- Se ejecuta cada vez que arranca el programa: IF NOT EXISTS evita que falle
 -- si las tablas ya existen.
--- Cambio frente al contrato: fuente.tipo acepta también 'decision', para las
--- reglas que salen de la bitácora (D-004, D-007, D-008, D-013, D-016).
+-- Cambios frente al contrato: fuente.tipo acepta también 'decision', para las
+-- reglas que salen de la bitácora (D-004, D-007, D-008, D-013, D-016), y
+-- 'espanol', para el vocabulario español del corrector (PP-14), que no viene
+-- del manual. También se agrega la tabla verbo_sin_objeto (D-020).
 
 CREATE TABLE IF NOT EXISTS fuente (
   id          INTEGER PRIMARY KEY,
-  tipo        TEXT NOT NULL CHECK (tipo IN ('manual','correccion','senal','decision')),
+  tipo        TEXT NOT NULL CHECK (tipo IN ('manual','correccion','senal','decision','espanol')),
   descripcion TEXT NOT NULL,
   fecha       TEXT NOT NULL
 );
@@ -45,6 +47,15 @@ CREATE TABLE IF NOT EXISTS morfologia_es (
   tiempo      TEXT NOT NULL,
   persona     INTEGER NOT NULL,
   numero      TEXT NOT NULL
+);
+
+-- Verbos que no llevan objeto (D-020). Se guarda el infinitivo y no el
+-- concepto, porque "estar" comparte concepto con "ser" (mi / ha) y "ser" sí
+-- puede llevar un complemento ("¿Es él una criatura?").
+CREATE TABLE IF NOT EXISTS verbo_sin_objeto (
+  id         INTEGER PRIMARY KEY,
+  infinitivo TEXT NOT NULL UNIQUE,
+  fuente_id  INTEGER NOT NULL REFERENCES fuente(id)
 );
 
 CREATE TABLE IF NOT EXISTS verbo_irregular (

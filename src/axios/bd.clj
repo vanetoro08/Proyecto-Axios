@@ -169,6 +169,11 @@
              (update :numero keyword))
         (consultar "SELECT terminacion, conjugacion, tiempo, persona, numero FROM morfologia_es")))
 
+(defn verbos-sin-objeto
+  "Infinitivos de los verbos que no llevan objeto (D-020): #{\"venir\" \"llegar\" \"estar\"}."
+  []
+  (into #{} (map :infinitivo) (consultar "SELECT infinitivo FROM verbo_sin_objeto")))
+
 (defn palabra-en
   "Forma vigente de un concepto en una lengua: {:forma \"kum\" :fuente-id 1 :palabra-id 37} o nil.
   Si hay varias formas (nosotros → anul y anir), devuelve la primera; el generador

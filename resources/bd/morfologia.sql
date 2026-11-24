@@ -202,3 +202,14 @@ INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES 
 INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('estuvo', 'estar', 'pasado', 3, 'singular');
 INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('estuvimos', 'estar', 'pasado', 1, 'plural');
 INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('estuvieron', 'estar', 'pasado', 3, 'plural');
+
+-- ============================================================
+-- VERBOS QUE NO LLEVAN OBJETO (D-020)
+-- El parser los usa para decidir si el sustantivo que va después del verbo
+-- es el sujeto ("¿Cuándo llegan sus naves?") o el objeto ("¿Quieren una nave?").
+-- ============================================================
+INSERT INTO fuente (id, tipo, descripcion, fecha)
+VALUES (8, 'decision', 'Bitácora D-020: verbos que no llevan objeto', '2026-11-23');
+INSERT INTO verbo_sin_objeto (infinitivo, fuente_id) VALUES ('venir', 8);
+INSERT INTO verbo_sin_objeto (infinitivo, fuente_id) VALUES ('llegar', 8);
+INSERT INTO verbo_sin_objeto (infinitivo, fuente_id) VALUES ('estar', 8);
