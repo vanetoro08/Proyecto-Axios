@@ -6,7 +6,7 @@
 
 -- Primero, insertamos la fuente
 INSERT INTO fuente (id, tipo, descripcion, fecha) 
-VALUES (7, 'manual', 'Vocabulario español extendido PP-14', '2026-11-23');
+VALUES (7, 'espanol', 'Vocabulario español extendido PP-14', '2026-11-23');
 
 -- ============================================================
 -- CONCEPTOS NUEVOS (que no están en manual_v07.sql)
@@ -41,8 +41,8 @@ INSERT INTO concepto (clave, categoria) VALUES ('ellos-pron', 'pronombre');
 INSERT INTO concepto (clave, categoria) VALUES ('ellas', 'pronombre');
 INSERT INTO concepto (clave, categoria) VALUES ('nosotros-pron', 'pronombre');
 
--- Interrogativos (variantes)
-INSERT INTO concepto (clave, categoria) VALUES ('cuantas', 'interrogativo');
+-- Interrogativos (variantes). "cuantas" no es un concepto aparte: es otra forma
+-- de "cuantos" (kai / wak), y se agrega más abajo como palabra de ese concepto.
 INSERT INTO concepto (clave, categoria) VALUES ('quienes', 'interrogativo');
 INSERT INTO concepto (clave, categoria) VALUES ('como', 'interrogativo');
 INSERT INTO concepto (clave, categoria) VALUES ('cual', 'interrogativo');
@@ -121,7 +121,7 @@ VALUES ((SELECT id FROM concepto WHERE clave = 'nosotros-pron'), 'es', 'nosotros
 
 -- Interrogativos
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) 
-VALUES ((SELECT id FROM concepto WHERE clave = 'cuantas'), 'es', 'cuantas', 7, '2026-11-23');
+VALUES ((SELECT id FROM concepto WHERE clave = 'cuantos'), 'es', 'cuantas', 7, '2026-11-23');
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) 
 VALUES ((SELECT id FROM concepto WHERE clave = 'quienes'), 'es', 'quienes', 7, '2026-11-23');
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) 
@@ -358,3 +358,24 @@ INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUE
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llegar', 7, '2026-11-23');
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llega', 7, '2026-11-23');
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llego', 7, '2026-11-23');
+
+-- ============================================================
+-- PRONOMBRES DE OBJETO ANTES DEL VERBO (D-017)
+-- "la", "los" y "las" ya están como determinantes: el parser los lee como
+-- pronombre de objeto cuando van justo antes del verbo (memoria 7.4).
+-- "le" y "les" se registran para que el corrector no los cambie por otra
+-- palabra, pero no tienen respaldo en el manual: el parser los rechaza
+-- como palabra desconocida (D-014, D-017).
+-- ============================================================
+INSERT INTO concepto (clave, categoria) VALUES ('me', 'clitico');
+INSERT INTO concepto (clave, categoria) VALUES ('te', 'clitico');
+INSERT INTO concepto (clave, categoria) VALUES ('nos', 'clitico');
+INSERT INTO concepto (clave, categoria) VALUES ('lo', 'clitico');
+INSERT INTO concepto (clave, categoria) VALUES ('le', 'clitico');
+INSERT INTO concepto (clave, categoria) VALUES ('les', 'clitico');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'me'), 'es', 'me', 7, '2026-11-24');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'te'), 'es', 'te', 7, '2026-11-24');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'nos'), 'es', 'nos', 7, '2026-11-24');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'lo'), 'es', 'lo', 7, '2026-11-24');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'le'), 'es', 'le', 7, '2026-11-24');
+INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'les'), 'es', 'les', 7, '2026-11-24');
