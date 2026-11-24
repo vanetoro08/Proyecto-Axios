@@ -3,17 +3,17 @@
   Contrato: (tokenizar texto) → [{:tipo :palabra :lexema \"...\" :pos {:inicio 0 :fin 5}} ...]
   Responsable: Luisa (E1).
   Nota: Recibe el :texto del normalizador, por lo que ya viene en minúsculas y sin tildes."
-  (:require [clojure.string :as str]))
+  (:require [axios.errores :as errores]))
 
+;; CORRECCIÓN: Sin regex, usando comparación de caracteres (ASCII)
 (defn- es-letra? [c]
-  ;; El texto ya viene normalizado (sin tildes, ñ convertida a n).
-  ;; Pero por seguridad aceptamos la ñ y vocales acentuadas por si acaso.
-  (boolean (re-matches #"[a-zñáéíóúü]" (str c))))
+  (or (and (>= (int c) 97) (<= (int c) 122)) ; a-z
+      (= c \ñ)))
 
 (defn- es-digito? [c]
-  (boolean (re-matches #"[0-9]" (str c))))
+  (and (>= (int c) 48) (<= (int c) 57))) ; 0-9
 
-(def signos #{\¿ \? \¡ \! \. \,})
+(def ^:private signos #{\¿ \? \¡ \! \. \,})
 
 (defn tokenizar [texto]
   (let [n (count texto)]
@@ -57,5 +57,6 @@
 
             ;; 5. Carácter inválido
             :else
-            (throw (ex-info (str "Carácter inválido en el texto: '" c "'") 
-                            {:fase :lexer :pos i :caracter c}))))))))
+            (throw (errores/error-de-fase :lexer :caracter-invalido 
+                                          (str "Carácter inválido: '" c "'") 
+                                          i))))))))
