@@ -7,7 +7,8 @@
   los archivos que se cargan con la orden `cargar`.
 
   Se usa SQLite con JDBC estándar (java.sql), sin librerías extra (D-001)."
-  (:require [clojure.java.io :as io]
+  (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.string :as str])
   (:import (java.sql Connection DriverManager ResultSet)))
 
@@ -241,27 +242,93 @@
                    (name lengua))))
 
 ;; ---------------------------------------------------------------------------
-;; STUB EN MEMORIA — todavía no escriben en la BD.
-;; registrar-pregunta! (con traduccion_palabra): PP-32. historial: PP-34.
-;; palabra-info: PP-33. cargar-archivo!: PP-30.
+;; Historial de preguntas (PP-32)
+;; Cada pregunta se guarda completa: con sus correcciones, sus dos traducciones
+;; y qué palabra de la BD se usó en cada traducción (traduccion_palabra). Así se
+;; puede demostrar que nada se inventó y qué se creía cuando se envió.
 ;; ---------------------------------------------------------------------------
 
-(defonce ^:private historial* (atom []))
+(defn- edn [x] (when (some? x) (pr-str x)))
+
+(defn- leer-edn [s] (when s (edn/read-string s)))
+
+(defn- id-de-palabra
+  "La fila de palabra que respalda una palabra generada: la que trae el
+  generador (:palabra-id) o, si no la trae, la vigente de su concepto."
+  [c lengua {:keys [palabra-id concepto]}]
+  (or palabra-id
+      (when concepto
+        (:id (first (consultar-en c "SELECT p.id FROM palabra p JOIN concepto co ON co.id = p.concepto_id
+                                     WHERE co.clave = ? AND p.lengua = ? AND p.vigente_hasta IS NULL
+                                     ORDER BY p.id"
+                                  (name concepto) (name lengua)))))))
 
 (defn registrar-pregunta!
-  "Guarda el resultado completo del pipeline. Devuelve su id."
-  [resultado]
-  (let [id (inc (count @historial*))]
-    (swap! historial* conj (assoc resultado :id id))
-    id))
+  "Guarda el resultado completo del pipeline en la BD, en una sola transacción.
+  Se llama siempre, también cuando la pregunta se rechaza (condición 1).
+  Devuelve el id de la pregunta."
+  [{:keys [fecha original normalizado arbol estado explicacion avisos correcciones traducciones]}]
+  (en-transaccion
+   (fn [c]
+     (let [id (ejecutar-en! c "INSERT INTO pregunta (fecha, original, normalizado, arbol, estado, explicacion, avisos)
+                               VALUES (?, ?, ?, ?, ?, ?, ?)"
+                            fecha original (:texto normalizado) (edn arbol)
+                            (name (or estado :rechazada)) explicacion (edn (vec avisos)))]
+       (doseq [{:keys [original corregida distancia pos]} correcciones]
+         (ejecutar-en! c "INSERT INTO correccion (pregunta_id, original, corregida, distancia, pos_inicio, pos_fin)
+                          VALUES (?, ?, ?, ?, ?, ?)"
+                       id original corregida distancia (:inicio pos) (:fin pos)))
+       (doseq [[lengua {:keys [texto valida? errores palabras]}] traducciones]
+         (let [tid (ejecutar-en! c "INSERT INTO traduccion (pregunta_id, lengua, texto, valida, errores)
+                                    VALUES (?, ?, ?, ?, ?)"
+                                 id (name lengua) texto (if valida? 1 0) (edn errores))]
+           (doseq [[orden p] (map-indexed vector palabras)]
+             (when-let [pid (id-de-palabra c lengua p)]
+               (ejecutar-en! c "INSERT INTO traduccion_palabra (traduccion_id, palabra_id, orden)
+                                VALUES (?, ?, ?)"
+                             tid pid orden)))))
+       id))))
+
+(defn- traducciones-de [c pregunta-id]
+  (into {}
+        (for [t (consultar-en c "SELECT id, lengua, texto, valida, errores FROM traduccion
+                                 WHERE pregunta_id = ? ORDER BY id" pregunta-id)]
+          [(keyword (:lengua t))
+           {:texto    (:texto t)
+            :valida?  (= 1 (:valida t))
+            :errores  (or (leer-edn (:errores t)) [])
+            :palabras (vec (consultar-en c "SELECT p.forma, co.clave AS concepto, p.fuente_id
+                                            FROM traduccion_palabra tp
+                                            JOIN palabra p ON p.id = tp.palabra_id
+                                            JOIN concepto co ON co.id = p.concepto_id
+                                            WHERE tp.traduccion_id = ? ORDER BY tp.orden"
+                                         (:id t)))}])))
 
 (defn historial
-  "Preguntas registradas, opcionalmente desde una fecha (texto ISO)."
+  "Preguntas registradas, de la más antigua a la más reciente. Con fecha
+  (\"2026-11-21\"), solo las que se hicieron desde ese día."
   ([] (historial nil))
   ([desde]
-   (if desde
-     (filter #(>= (compare (:fecha %) desde) 0) @historial*)
-     @historial*)))
+   (with-open [c (conexion)]
+     (vec
+      (for [p (if desde
+                (consultar-en c "SELECT * FROM pregunta WHERE fecha >= ? ORDER BY id" desde)
+                (consultar-en c "SELECT * FROM pregunta ORDER BY id"))]
+        {:id           (:id p)
+         :fecha        (:fecha p)
+         :original     (:original p)
+         :normalizado  (:normalizado p)
+         :arbol        (leer-edn (:arbol p))
+         :estado       (keyword (:estado p))
+         :explicacion  (:explicacion p)
+         :avisos       (or (leer-edn (:avisos p)) [])
+         :correcciones (vec (consultar-en c "SELECT original, corregida, distancia FROM correccion
+                                             WHERE pregunta_id = ? ORDER BY id" (:id p)))
+         :traducciones (traducciones-de c (:id p))})))))
+
+;; ---------------------------------------------------------------------------
+;; STUB — palabra-info: PP-33.
+;; ---------------------------------------------------------------------------
 
 (defn palabra-info
   "Lo que el sistema sabe de un término en las tres lenguas.

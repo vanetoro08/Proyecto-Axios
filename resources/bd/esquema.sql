@@ -5,7 +5,9 @@
 -- Cambios frente al contrato: fuente.tipo acepta también 'decision', para las
 -- reglas que salen de la bitácora (D-004, D-007, D-008, D-013, D-016), y
 -- 'espanol', para el vocabulario español del corrector (PP-14), que no viene
--- del manual. También se agrega la tabla verbo_sin_objeto (D-020).
+-- del manual. También se agregan la tabla verbo_sin_objeto (D-020) y la
+-- columna pregunta.avisos, para que el historial muestre cómo se interpretó
+-- cada pregunta.
 
 CREATE TABLE IF NOT EXISTS fuente (
   id          INTEGER PRIMARY KEY,
@@ -83,7 +85,8 @@ CREATE TABLE IF NOT EXISTS pregunta (
   normalizado TEXT,
   arbol       TEXT,
   estado      TEXT NOT NULL CHECK (estado IN ('aprobada','rechazada')),
-  explicacion TEXT
+  explicacion TEXT,
+  avisos      TEXT               -- lista de avisos en EDN (D-006, D-010, D-015, D-017, D-023)
 );
 
 CREATE TABLE IF NOT EXISTS correccion (
