@@ -194,3 +194,11 @@ INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES 
 INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('va', 'ir', 'presente', 3, 'singular');
 INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('vamos', 'ir', 'presente', 1, 'plural');
 INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('van', 'ir', 'presente', 3, 'plural');
+-- estar (manual 3.1: "ser, estar" → mi / ha). Solo las formas irregulares;
+-- esta, estan, estamos, estare... salen de las terminaciones regulares.
+INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('estoy', 'estar', 'presente', 1, 'singular');
+INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('estuve', 'estar', 'pasado', 1, 'singular');
+INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('estuviste', 'estar', 'pasado', 2, 'singular');
+INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('estuvo', 'estar', 'pasado', 3, 'singular');
+INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('estuvimos', 'estar', 'pasado', 1, 'plural');
+INSERT INTO verbo_irregular (forma, infinitivo, tiempo, persona, numero) VALUES ('estuvieron', 'estar', 'pasado', 3, 'plural');

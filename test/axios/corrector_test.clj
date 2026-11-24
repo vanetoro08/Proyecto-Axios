@@ -44,3 +44,20 @@
     (testing "Si no hay corrección aceptable, se deja igual"
       (is (empty? (:correcciones res)))
       (is (= "xyz" (:lexema (first (:tokens res))))))))
+;; --- Correcciones de la segunda revisión ---
+
+(deftest test-umbral-segun-largo
+  (testing "Palabras de hasta 5 letras: distancia 1 (D-022). armas no se vuelve aguas"
+    (let [res (corrector/corregir [{:tipo :palabra :lexema "armas" :pos {:inicio 0 :fin 5}}] #{"aguas"})]
+      (is (empty? (:correcciones res))))))
+
+(deftest test-no-toca-conjugaciones-validas
+  (testing "Lo que la morfología reconoce no se corrige aunque no esté en el vocabulario"
+    (let [res (corrector/corregir [{:tipo :palabra :lexema "visitaran" :pos {:inicio 0 :fin 9}}
+                                   {:tipo :palabra :lexema "estan" :pos {:inicio 10 :fin 15}}]
+                                  #{"visitaron" "estar"})]
+      (is (empty? (:correcciones res))))))
+
+(deftest test-empate-mismo-largo
+  (let [res (corrector/corregir [{:tipo :palabra :lexema "lleagn" :pos {:inicio 0 :fin 6}}] #{"llega" "llegan"})]
+    (is (= "llegan" (:corregida (first (:correcciones res)))))))
