@@ -141,7 +141,8 @@
   [forma]
   (when-let [f (first (consultar "SELECT c.clave, c.categoria
                                   FROM palabra p JOIN concepto c ON c.id = p.concepto_id
-                                  WHERE p.lengua = 'es' AND p.forma = ? AND p.vigente_hasta IS NULL"
+                                  WHERE p.lengua = 'es' AND p.forma = ? AND p.vigente_hasta IS NULL
+                                  ORDER BY p.id"
                                  forma))]
     {:concepto (keyword (:clave f)) :categoria (keyword (:categoria f))}))
 
