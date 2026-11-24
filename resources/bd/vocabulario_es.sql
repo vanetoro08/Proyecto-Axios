@@ -143,9 +143,7 @@ INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUE
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'pero'), 'es', 'pero', 7, '2026-11-23');
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'no'), 'es', 'no', 7, '2026-11-23');
 
--- Sinónimos (llegar → venir)
-INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) 
-VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llegar', 7, '2026-11-23');
+-- Sinónimos: "llegar" (→ venir) ya viene en manual_v07.sql; no se repite aquí.
 
 -- Conceptos compuestos
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) 
@@ -355,7 +353,6 @@ INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUE
 -- Conjugaciones de "venir" (llegar) que faltaban
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llegan', 7, '2026-11-23');
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llegaron', 7, '2026-11-23');
-INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llegar', 7, '2026-11-23');
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llega', 7, '2026-11-23');
 INSERT INTO palabra (concepto_id, lengua, forma, fuente_id, vigente_desde) VALUES ((SELECT id FROM concepto WHERE clave = 'venir'), 'es', 'llego', 7, '2026-11-23');
 

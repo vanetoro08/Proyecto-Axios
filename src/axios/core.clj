@@ -73,6 +73,33 @@
         (doseq [aviso (:avisos r)]
           (println "  Aviso:" aviso))))))
 
+(def ^:private nombre-lengua {:es "Español" :kethari "Kethari" :ozh "Ozh"})
+
+(defn- vigencia [{:keys [desde hasta]}]
+  (str "desde " desde (when hasta (str " hasta " hasta))))
+
+(defn- mostrar-palabra
+  "Orden palabra (PP-33): cada significado del término, con su vigencia, su
+  fuente y sus equivalentes en las otras lenguas."
+  [termino fecha]
+  (if (nil? termino)
+    (println "Falta el término. Uso: palabra <término> [en <fecha>]")
+    (try
+      (let [{:keys [significados] :as info} (bd/palabra-info termino fecha)]
+        (if (empty? significados)
+          (println (str "'" (:termino info) "' no está en la base de datos"
+                        (when fecha (str " con vigencia el " fecha)) "."))
+          (doseq [{:keys [lengua significado fuente equivalentes] :as s} significados]
+            (println (str (:termino info) " (" (nombre-lengua lengua) ") = \"" significado "\""))
+            (println (str "  Vigente " (vigencia s) ". Fuente: " fuente))
+            (doseq [[l vs] equivalentes]
+              (println (str "  " (nombre-lengua l) ": "
+                            (apply str (interpose ", " (for [v vs]
+                                                         (str (:forma v)
+                                                              (when (:hasta v) (str " (" (vigencia v) ")"))))))))))))
+      (catch clojure.lang.ExceptionInfo e
+        (println (ex-message e))))))
+
 (defn ejecutar
   "Interpreta los argumentos y ejecuta la orden. Separado de -main para poder probarlo."
   [args]
@@ -86,7 +113,7 @@
       "historial" (let [[_ fecha] resto]               ; historial desde 2026-11-21
                     (mostrar-historial fecha))
       "palabra"   (let [[termino _ fecha] resto]       ; palabra vael en 2026-11-21
-                    (pp/pprint (bd/palabra-info termino fecha)))
+                    (mostrar-palabra termino fecha))
       (println uso))))
 
 (defn -main [& args]

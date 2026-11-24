@@ -327,17 +327,6 @@
          :traducciones (traducciones-de c (:id p))})))))
 
 ;; ---------------------------------------------------------------------------
-;; STUB — palabra-info: PP-33.
-;; ---------------------------------------------------------------------------
-
-(defn palabra-info
-  "Lo que el sistema sabe de un término en las tres lenguas.
-  Sin fecha (nil): todas las versiones, con su vigencia y su fuente.
-  Con fecha: solo la versión vigente en esa fecha. TODO PP-33 / PP-34."
-  [termino _fecha]
-  {:termino termino :significados []})
-
-;; ---------------------------------------------------------------------------
 ;; Orden `cargar` (PP-30, bitácora D-002)
 ;; ---------------------------------------------------------------------------
 
@@ -521,3 +510,74 @@
              :repetidas    (count (filter :repetida resultados))
              :errores      (vec (for [r resultados :when (:error r)]
                                   {:linea (:linea r) :motivo (:error r)}))})))))))
+
+;; ---------------------------------------------------------------------------
+;; Orden `palabra` (PP-33)
+;; ---------------------------------------------------------------------------
+
+(defn- fecha-valida
+  "La fecha tiene que venir como AAAA-MM-DD (ej. 2026-11-21)."
+  [fecha]
+  (try (str (java.time.LocalDate/parse fecha))
+       (catch java.time.format.DateTimeParseException _
+         (throw (ex-info (str "La fecha '" fecha "' no es válida. Use el formato AAAA-MM-DD, por ejemplo 2026-11-21.")
+                         {:fase :palabra :tipo :fecha-invalida :detalle {:fecha fecha}})))))
+
+(def ^:private vigente-en
+  "Condición de vigencia: desde ≤ fecha y (sin hasta o fecha < hasta)."
+  "p.vigente_desde <= ? AND (p.vigente_hasta IS NULL OR ? < p.vigente_hasta)")
+
+(defn- version [fila]
+  {:forma  (:forma fila)
+   :desde  (:vigente-desde fila)
+   :hasta  (:vigente-hasta fila)
+   :fuente (:fuente fila)})
+
+(defn palabra-info
+  "Lo que el sistema sabe de un término, en las tres lenguas.
+  El término puede estar en español, Kethari u Ozh (\"nave\", \"kum\", \"gor\").
+  Sin fecha (nil): todas las versiones, con su vigencia y su fuente.
+  Con fecha (\"2026-11-21\"): solo lo que estaba vigente ese día.
+
+  Devuelve {:termino :fecha :significados [{:lengua :significado :concepto
+  :desde :hasta :fuente :equivalentes {:es [...] :kethari [...] :ozh [...]}}]}."
+  [termino fecha]
+  (let [fecha   (when fecha (fecha-valida fecha))
+        termino (str/trim (str/lower-case termino))
+        filtro  (if fecha (str " AND " vigente-en) "")
+        con-fecha (fn [& params] (if fecha (concat params [fecha fecha]) params))]
+    (with-open [c (conexion)]
+      (let [filas (apply consultar-en c
+                         (str "SELECT p.id, p.lengua, p.forma, p.concepto_id, co.clave,
+                                      p.vigente_desde, p.vigente_hasta, f.descripcion AS fuente
+                               FROM palabra p
+                               JOIN concepto co ON co.id = p.concepto_id
+                               JOIN fuente f ON f.id = p.fuente_id
+                               WHERE p.forma IN (?, ?)" filtro
+                              " ORDER BY p.vigente_desde, p.id")
+                         (con-fecha termino (sin-tildes termino)))
+            significado (fn [concepto-id]
+                          (:forma (first (consultar-en c "SELECT forma FROM palabra
+                                                          WHERE concepto_id = ? AND lengua = 'es'
+                                                          ORDER BY id" concepto-id))))
+            equivalentes (fn [{:keys [concepto-id id]}]
+                           (let [otras (apply consultar-en c
+                                              (str "SELECT p.lengua, p.forma, p.vigente_desde, p.vigente_hasta,
+                                                           f.descripcion AS fuente
+                                                    FROM palabra p JOIN fuente f ON f.id = p.fuente_id
+                                                    WHERE p.concepto_id = ? AND p.id <> ?" filtro
+                                                   " ORDER BY p.id")
+                                              (con-fecha concepto-id id))]
+                             (into {}
+                                   (for [lengua ["es" "kethari" "ozh"]
+                                         :let [vs (mapv version (filter #(= lengua (:lengua %)) otras))]
+                                         :when (seq vs)]
+                                     [(keyword lengua) vs]))))]
+        {:termino      termino
+         :fecha        fecha
+         :significados (vec (for [f filas]
+                              (merge {:lengua      (keyword (:lengua f))
+                                      :significado (significado (:concepto-id f))
+                                      :concepto    (keyword (:clave f))}
+                                     (dissoc (version f) :forma)
+                                     {:equivalentes (equivalentes f)})))}))))
