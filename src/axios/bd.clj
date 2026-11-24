@@ -83,6 +83,7 @@
     (ejecutar-script! c "bd/esquema.sql")
     (when (bd-vacia? c)
       (ejecutar-script! c "bd/manual_v07.sql")
+      (ejecutar-script! c "bd/morfologia.sql")
       (ejecutar-script! c "bd/vocabulario_es.sql"))))
 
 (defonce ^:private lista (delay (inicializar!)))
