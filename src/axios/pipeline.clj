@@ -45,9 +45,10 @@
            :arbol        arbol
            :traducciones {:kethari kethari :ozh ozh}
            :estado       (if ambas-ok? :aprobada :rechazada)
-           ;; TODO PP-16 / PP-19: juntar los avisos que agreguen la morfología y el
-           ;; parser (D-006, D-010, D-015). Por ahora ninguna fase los produce.
-           :avisos       []
+           ;; Avisos de cómo se interpretó la pregunta: los de la morfología
+           ;; (D-015) y los del parser (D-006, D-010, D-017, D-023).
+           :avisos       (into (vec (keep #(get-in % [:verbo :aviso]) analizados))
+                               (:avisos arbol))
            :explicacion  (when-not ambas-ok?
                            "Una de las traducciones no pasó la validación; no se transmite ninguna."))))
 

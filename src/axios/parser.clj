@@ -1,5 +1,5 @@
 (ns axios.parser
-  "Fase 5. Analizador sintáctico descendente recursivo (PP-18).
+  "Fase 5. Analizador sintáctico descendente recursivo (PP-18, PP-19).
   Responsable: Nicolas (E2).
 
   Sigue la gramática de la memoria, sección 7.2. Cada no terminal es una
@@ -7,12 +7,10 @@
   Entrega el árbol intermedio de contratos.md (sección 6): solo conceptos
   neutrales, nada de Kethari ni de Ozh.
 
-  Esta primera parte (PP-18) reconoce afirmaciones, negación y preguntas:
-  D-006 (sin signos), D-011 (un/una), D-014 (palabras sin equivalente),
-  D-017 (pronombres de objeto), D-018 (cuántos), D-020 (sujeto u objeto
-  después del verbo) y D-021 (comas y exclamaciones).
-  Falta PP-19: posesivos, sujeto omitido (D-010), verbos con dos lecturas
-  (D-023) y los avisos.
+  Decisiones que aplica: D-006 (sin signos), D-010 (sujeto omitido y \"su\"),
+  D-011 (un/una), D-014 (palabras sin equivalente), D-015 y D-023 (verbos con dos
+  lecturas), D-017 (pronombres de objeto), D-018 (cuántos), D-020 (sujeto u
+  objeto después del verbo) y D-021 (comas y exclamaciones).
 
   Aquí no hay vocabulario: las palabras y sus categorías vienen de la
   morfología, y la lista de verbos sin objeto viene de la BD. Los mapas de
@@ -33,6 +31,20 @@
    :quien   :sujeto
    :cuantos :cantidad})
 
+(def ^:private persona-posesivo
+  "Persona y número del poseedor. \"su\" y \"sus\" no están: dependen del tipo de
+  oración y se resuelven al final (D-010)."
+  {:mi       {:persona 1 :numero :singular}
+   :mis      {:persona 1 :numero :singular}
+   :tu-pos   {:persona 2 :numero :singular}
+   :tus      {:persona 2 :numero :singular}
+   :nuestro  {:persona 1 :numero :plural}
+   :nuestra  {:persona 1 :numero :plural}
+   :nuestros {:persona 1 :numero :plural}
+   :nuestras {:persona 1 :numero :plural}})
+
+(def ^:private posesivo-ambiguo #{:su :sus})
+
 (def ^:private persona-clitico
   "Pronombres de objeto antes del verbo (D-017): me → yo, te → tú,
   nos → nosotros, lo/la → él, los/las → ellos. \"le\" y \"les\" no están: no
@@ -45,6 +57,10 @@
    :los {:persona 3 :numero :plural}
    :las {:persona 3 :numero :plural}})
 
+(def ^:private clitico-ambiguo
+  "\"los\" y \"las\" pueden ser ellos o ustedes: se avisa (D-017)."
+  #{:los :las})
+
 (def ^:private articulos
   "Determinantes que pueden ir antes del sustantivo. No pasan al árbol (D-011)."
   #{:el-art :la :los :las :un :una})
@@ -52,6 +68,15 @@
 (def ^:private preposiciones-aceptadas
   "Solo la \"a\" de persona y la \"de\" de posesión (D-014)."
   #{:a :de})
+
+(def ^:private nombre-pronombre
+  "Cómo se escribe en español el sujeto deducido, solo para los avisos."
+  {[1 :singular] "yo"
+   [2 :singular] "usted"
+   [3 :singular] "él"
+   [1 :plural]   "nosotros"
+   [2 :plural]   "ustedes"
+   [3 :plural]   "ellos"})
 
 ;; ---------------------------------------------------------------------------
 ;; Ayudas para mirar los tokens
@@ -86,9 +111,9 @@
 ;; token siguiente para decidir.
 
 (defn- inicia-sustantivo?
-  "¿Con este token empieza un sustantivo? (número o el sustantivo)."
+  "¿Con este token empieza un sustantivo? (posesivo, número o el sustantivo)."
   [t]
-  (or (sustantivo? t) (numero? t)))
+  (or (sustantivo? t) (numero? t) (cat? t :posesivo)))
 
 (defn- articulo?
   "\"el\" llega como pronombre y \"la\", \"los\", \"las\" como determinante: son
@@ -98,6 +123,13 @@
     (and (or (and (cat? t :determinante) (articulos (:concepto t)))
              (and (cat? t :pronombre) (concepto? t :el)))
          (inicia-sustantivo? (tok ts (inc i))))))
+
+(defn- posesivo-tu?
+  "\"tu\" es posesivo antes de un sustantivo y pronombre en otro caso (D-003)."
+  [ts i]
+  (let [t (tok ts i)]
+    (and (cat? t :pronombre) (concepto? t :tu)
+         (let [s (tok ts (inc i))] (or (sustantivo? s) (numero? s))))))
 
 (defn- clitico?
   "Pronombre de objeto: los de la BD (me, te, nos, lo) y \"la\", \"los\", \"las\"
@@ -146,36 +178,70 @@
     {:tipo :pronombre :persona (:persona p) :numero (:numero p) :inferido? false}
     (error-estructura "un pronombre conocido" t)))
 
+(defn- poseedor-de-posesivo
+  "Posesivo antes del sustantivo. \"su/sus\" queda pendiente hasta saber si la
+  oración es pregunta o afirmación (D-010)."
+  [ts i]
+  (let [t (tok ts i)]
+    (cond
+      (posesivo-tu? ts i)
+      {:tipo :pronombre :persona 2 :numero :singular}
+
+      (posesivo-ambiguo (:concepto t))
+      {:tipo :pronombre :pendiente-su (:lexema t)}
+
+      :else
+      (if-let [p (persona-posesivo (:concepto t))]
+        (assoc p :tipo :pronombre)
+        (error-estructura "un posesivo conocido" t)))))
+
+(defn- de-poseedor
+  "<de-poseedor> ::= \"de\" PRONOMBRE"
+  [ts i]
+  (let [t (tok ts (inc i))]
+    (if (cat? t :pronombre)
+      [(dissoc (pronombre-de t) :inferido?) (+ i 2)]
+      (error-estructura "un pronombre después de 'de'" t))))
+
 (defn- grupo-sustantivo
-  "<grupo-sustantivo> ::= [ <articulo> ] [ NUMERO ] SUSTANTIVO
-  (los posesivos llegan en PP-19)"
+  "<grupo-sustantivo> ::= [ <articulo> ] [ POSESIVO ] [ NUMERO ] SUSTANTIVO [ <de-poseedor> ]"
   [ts i]
   (let [i (if (articulo? ts i) (inc i) i)
+        [poseedor i] (if (or (cat? (tok ts i) :posesivo) (posesivo-tu? ts i))
+                       [(poseedor-de-posesivo ts i) (inc i)]
+                       [nil i])
         [cantidad i] (if (numero? (tok ts i))
                        [(:valor (tok ts i)) (inc i)]
                        [nil i])
         s (tok ts i)]
     (when-not (sustantivo? s)
       (error-estructura "un sustantivo" s))
-    [{:tipo     :sustantivo
-      :concepto (:concepto s)
-      :plural?  (boolean (:plural? s))
-      :cantidad cantidad
-      :poseedor nil
-      :lexema   (:lexema s)}
-     (inc i)]))
+    (let [i (inc i)
+          [de i] (if (and (cat? (tok ts i) :preposicion) (concepto? (tok ts i) :de))
+                   (de-poseedor ts i)
+                   [nil i])]
+      (when (and poseedor de)
+        (error-estructura "un solo poseedor (posesivo o 'de' + pronombre, no los dos)" (tok ts (- i 2))))
+      [{:tipo     :sustantivo
+        :concepto (:concepto s)
+        :plural?  (boolean (:plural? s))
+        :cantidad cantidad
+        :poseedor (or poseedor de)
+        :lexema   (:lexema s)}
+       i])))
 
 (defn- inicia-frase-nominal? [ts i]
   (let [t (tok ts i)]
-    (or (cat? t :pronombre)
+    (or (and (cat? t :pronombre) (not (posesivo-tu? ts i)))
         (articulo? ts i)
+        (posesivo-tu? ts i)
         (inicia-sustantivo? t))))
 
 (defn- frase-nominal
   "<frase-nominal> ::= PRONOMBRE | <grupo-sustantivo>"
   [ts i]
   (let [t (tok ts i)]
-    (if (and (cat? t :pronombre) (not (articulo? ts i)))
+    (if (and (cat? t :pronombre) (not (articulo? ts i)) (not (posesivo-tu? ts i)))
       [(assoc (pronombre-de t) :lexema (:lexema t)) (inc i)]
       (grupo-sustantivo ts i))))
 
@@ -258,11 +324,17 @@
     [(assoc gv :sujeto sujeto :complementos comps) i]))
 
 ;; ---------------------------------------------------------------------------
-;; Papeles: qué es sujeto y qué es objeto
+;; Papeles, sujeto deducido y avisos
 ;; ---------------------------------------------------------------------------
 
 (defn- concuerda? [frase verbo]
   (= (if (:plural? frase) :plural :singular) (get-in verbo [:verbo :numero])))
+
+(defn- persona-de [frase]
+  (case (:tipo frase)
+    :pronombre  [(:persona frase) (:numero frase)]
+    :sustantivo [3 (if (:plural? frase) :plural :singular)]
+    nil))
 
 (defn- asignar-papeles
   "Decide qué es sujeto y qué es objeto (D-020, D-017, D-018).
@@ -310,11 +382,56 @@
             e)]
     (assoc e :clitico-usado? usar-clitico?)))
 
+(defn- deducir-sujeto
+  "Sujeto no escrito: se deduce del verbo (D-010). En tercera persona, en las
+  preguntas se entiende ustedes/usted y en las afirmaciones ellos/él."
+  [verbo pregunta?]
+  (let [{:keys [persona numero]} (:verbo verbo)
+        [persona avisar?] (if (= 3 persona)
+                            [(if pregunta? 2 3) true]
+                            [persona false])]
+    {:sujeto {:tipo :pronombre :persona persona :numero numero :inferido? true}
+     :aviso  (when avisar?
+               (str "Se interpretó '" (:lexema verbo) "' como '"
+                    (nombre-pronombre [persona numero]) " " (:lexema verbo) "' (D-010)."))}))
+
+(defn- resolver-tiempo
+  "Verbos con dos lecturas sin tilde (D-023): envio = envío (yo) o envió (él).
+  Si el sujeto es de la persona de la otra lectura, se usa esa. Las formas en
+  -amos (D-015) tienen la misma persona en las dos lecturas y quedan en presente;
+  su aviso lo pone la morfología. Solo se avisa si el sujeto no está escrito:
+  con \"yo\" no hay duda."
+  [verbo persona-sujeto escrito?]
+  (let [{:keys [tiempo persona numero alternativa]} (:verbo verbo)
+        alt (when alternativa [(:persona alternativa) (:numero alternativa)])]
+    (cond
+      (or (nil? alt) (= alt [persona numero]))
+      {:tiempo tiempo}
+
+      (= alt persona-sujeto)
+      {:tiempo (:tiempo alternativa)}
+
+      :else
+      {:tiempo tiempo
+       :aviso  (when-not escrito?
+                 (str "Se interpretó '" (:lexema verbo) "' en presente, con sujeto 'yo' (D-023)."))})))
+
+(defn- resolver-su
+  "\"su/sus\": en preguntas → de ustedes; en afirmaciones → de ellos (D-010)."
+  [frase pregunta? avisos]
+  (if-let [lex (get-in frase [:poseedor :pendiente-su])]
+    (let [persona (if pregunta? 2 3)]
+      [(assoc frase :poseedor {:tipo :pronombre :persona persona :numero :plural})
+       (conj avisos (str "Se interpretó '" lex "' como 'de "
+                         (nombre-pronombre [persona :plural]) "' (D-010)."))])
+    [frase avisos]))
+
 (defn- limpiar
   "Quita las marcas internas: el árbol solo lleva lo del contrato."
   [frase]
   (when frase
-    (dissoc frase :lexema :con-a?)))
+    (cond-> (dissoc frase :lexema :con-a?)
+      (= :sustantivo (:tipo frase)) (update :poseedor #(some-> % (dissoc :inferido?))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Oración
@@ -326,24 +443,52 @@
   (vec (remove #(signo? % ",") tokens)))
 
 (defn- construir-arbol
-  "Arma el árbol del contrato. Si el sujeto no está escrito, queda en nil:
-  deducirlo del verbo es parte de PP-19 (D-010)."
-  [{:keys [tipo interrogativo cuantos pred]}]
-  (let [verbo   (:verbo pred)
-        papeles (asignar-papeles {:interrogativo interrogativo
-                                  :cuantos       cuantos
-                                  :sujeto        (:sujeto pred)
-                                  :clitico       (:clitico pred)
-                                  :complementos  (:complementos pred)
-                                  :verbo         verbo})]
+  [{:keys [tipo interrogativo cuantos pred sin-signos?]}]
+  (let [pregunta? (not= :afirmacion tipo)
+        verbo     (:verbo pred)
+        papeles   (asignar-papeles {:interrogativo interrogativo
+                                    :cuantos       cuantos
+                                    :sujeto        (:sujeto pred)
+                                    :clitico       (:clitico pred)
+                                    :complementos  (:complementos pred)
+                                    :verbo         verbo})
+        avisos    (cond-> []
+                    sin-signos? (conj "Se interpretó como afirmación porque no tiene signos de pregunta (D-006)."))
+        ;; Sujeto: escrito, la palabra interrogativa (quién) o deducido del verbo.
+        [sujeto avisos persona-sujeto]
+        (cond
+          (:sujeto papeles)
+          [(:sujeto papeles) avisos (persona-de (:sujeto papeles))]
+
+          (= :sujeto (:rol interrogativo))
+          [nil avisos [3 :singular]]
+
+          (get-in verbo [:verbo :alternativa :persona])
+          ;; Sin sujeto y con dos lecturas (D-023 y D-015): se queda el presente.
+          [{:tipo :pronombre :persona (get-in verbo [:verbo :persona])
+            :numero (get-in verbo [:verbo :numero]) :inferido? true}
+           avisos nil]
+
+          :else
+          (let [{:keys [sujeto aviso]} (deducir-sujeto verbo pregunta?)]
+            [sujeto (cond-> avisos aviso (conj aviso)) (persona-de sujeto)]))
+        {:keys [tiempo aviso]} (resolver-tiempo verbo persona-sujeto (some? (:sujeto papeles)))
+        avisos (cond-> avisos aviso (conj aviso))
+        objeto (:objeto papeles)
+        avisos (cond-> avisos
+                 (and (:clitico-usado? papeles) (clitico-ambiguo (:concepto (:clitico pred))))
+                 (conj (str "Se interpretó '" (:lexema (:clitico pred)) "' como 'ellos' (D-017).")))
+        [sujeto avisos] (resolver-su sujeto pregunta? avisos)
+        [objeto avisos] (resolver-su objeto pregunta? avisos)]
     {:tipo          tipo
      :interrogativo (cond-> interrogativo
                       (:cuantos-en papeles) (assoc :sobre (:cuantos-en papeles)))
-     :sujeto        (limpiar (:sujeto papeles))
+     :sujeto        (limpiar sujeto)
      :verbo         {:concepto (:concepto verbo)
-                     :tiempo   (get-in verbo [:verbo :tiempo])
+                     :tiempo   tiempo
                      :negado?  (:negado? pred)}
-     :objeto        (limpiar (:objeto papeles))}))
+     :objeto        (limpiar objeto)
+     :avisos        avisos}))
 
 (defn- oracion
   "<oracion> ::= <pregunta-abierta> | <pregunta-si-no> | <afirmacion>
@@ -380,11 +525,12 @@
     (construir-arbol {:tipo          tipo
                       :interrogativo interrogativo
                       :cuantos       cuantos
-                      :pred          pred})))
+                      :pred          pred
+                      :sin-signos?   (and (= :afirmacion tipo) (not exclama?) (nil? cierre))})))
 
 (defn analizar
   "Recibe los tokens de la morfología y devuelve el árbol intermedio
-  (contratos.md, sección 6).
+  (contratos.md, sección 6), con :avisos para lo que se interpretó.
   Si no cumplen la gramática, lanza un error de fase :parser."
   [tokens]
   (let [ts (quitar-comas tokens)]
