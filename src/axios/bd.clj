@@ -78,15 +78,19 @@
     (.next rs)
     (zero? (.getInt rs 1))))
 
+(declare cargar-senales-iniciales!)
+
 (defn- inicializar!
-  "Crea las tablas si no existen y, si la BD está vacía, carga el vocabulario y el manual v0.7."
+  "Crea las tablas si no existen y, si la BD está vacía, carga el manual v0.7,
+  la morfología, el vocabulario y las señales de la semana 1 (D-025)."
   []
   (with-open [c (abrir)]
     (ejecutar-script! c "bd/esquema.sql")
     (when (bd-vacia? c)
       (ejecutar-script! c "bd/manual_v07.sql")
       (ejecutar-script! c "bd/morfologia.sql")
-      (ejecutar-script! c "bd/vocabulario_es.sql"))))
+      (ejecutar-script! c "bd/vocabulario_es.sql")
+      (cargar-senales-iniciales! c))))
 
 (defonce ^:private inicializadas (atom #{}))
 
@@ -139,20 +143,25 @@
     (.executeUpdate ps))
   (:id (first (consultar-en c "SELECT last_insert_rowid() AS id"))))
 
+(defn- transaccion-en
+  "Ejecuta (f c) sobre una conexión ya abierta, en una sola transacción."
+  [^Connection c f]
+  (.setAutoCommit c false)
+  (try
+    (let [r (f c)]
+      (.commit c)
+      r)
+    (catch Exception e
+      (.rollback c)
+      (throw e))
+    (finally
+      (.setAutoCommit c true))))
+
 (defn- en-transaccion
   "Ejecuta (f conexion) en una sola transacción: o entra todo o no entra nada."
   [f]
   (with-open [c (conexion)]
-    (.setAutoCommit c false)
-    (try
-      (let [r (f c)]
-        (.commit c)
-        r)
-      (catch Exception e
-        (.rollback c)
-        (throw e))
-      (finally
-        (.setAutoCommit c true)))))
+    (transaccion-en c f)))
 
 (defn- consultar
   "Ejecuta un SELECT con parámetros (?) y devuelve una lista de mapas."
@@ -458,6 +467,44 @@
                       (:id nuevo) lengua forma fid fecha)
         {:correccion true}))))
 
+(defn- cargar-lineas!
+  "Procesa las líneas de un archivo de señales o correcciones dentro de la
+  conexión c (que ya está en una transacción). `nombre` es el que queda en la
+  descripción de la fuente. Devuelve {:version :senales :correcciones :repetidas :errores}."
+  [c lineas nombre fecha]
+  (let [version (version-del-manual lineas)
+        nombre  (str nombre (when version (str " (manual " version ")")))
+        fuentes (atom {})
+        fuente-senal (fn [] (fuente-de-carga! c fuentes "senal"
+                                              (str "Señales de " nombre) fecha))
+        fuente-corr  (fn [] (fuente-de-carga! c fuentes "correccion"
+                                              (str "Correcciones de " nombre) fecha))
+        resultados
+        (doall
+         (for [[n linea] (map-indexed (fn [i l] [(inc i) (str/trim l)]) lineas)
+               :when (not (or (str/blank? linea) (str/starts-with? linea "#")))]
+           (let [campos (partir-campos linea)
+                 tipo   (str/upper-case (first campos))
+                 r (cond
+                     (not (#{"SENAL" "CORRECCION"} tipo))
+                     {:error (str "tipo desconocido '" (first campos) "'")}
+
+                     (not= 5 (count campos))
+                     {:error (str "se esperaban 5 campos y hay " (count campos))}
+
+                     (= "SENAL" tipo)
+                     (cargar-senal! c fuente-senal campos)
+
+                     :else
+                     (cargar-correccion! c fuente-corr fecha campos))]
+             (assoc r :linea n))))]
+    {:version      version
+     :senales      (count (filter :senal resultados))
+     :correcciones (count (filter :correccion resultados))
+     :repetidas    (count (filter :repetida resultados))
+     :errores      (vec (for [r resultados :when (:error r)]
+                          {:linea (:linea r) :motivo (:error r)}))}))
+
 (defn cargar-archivo!
   "Incorpora un archivo de señales o de correcciones del manual (D-002), sin
   tocar el código. Cada línea dice su tipo en el primer campo:
@@ -474,42 +521,46 @@
      (when-not (.isFile archivo)
        (throw (ex-info (str "No existe el archivo '" ruta "'.")
                        {:fase :cargar :tipo :archivo-no-encontrado :detalle {:ruta ruta}})))
-     (let [lineas  (with-open [r (io/reader archivo :encoding "UTF-8")] (vec (line-seq r)))
-           version (version-del-manual lineas)
-           nombre  (str (.getName archivo) (when version (str " (manual " version ")")))
-           fuentes (atom {})]
-       (en-transaccion
-        (fn [c]
-          (let [fuente-senal (fn [] (fuente-de-carga! c fuentes "senal"
-                                                      (str "Señales de " nombre) fecha))
-                fuente-corr  (fn [] (fuente-de-carga! c fuentes "correccion"
-                                                      (str "Correcciones de " nombre) fecha))
-                resultados
-                (for [[n linea] (map-indexed (fn [i l] [(inc i) (str/trim l)]) lineas)
-                      :when (not (or (str/blank? linea) (str/starts-with? linea "#")))]
-                  (let [campos (partir-campos linea)
-                        tipo   (str/upper-case (first campos))
-                        r (cond
-                            (not (#{"SENAL" "CORRECCION"} tipo))
-                            {:error (str "tipo desconocido '" (first campos) "'")}
+     (let [lineas (with-open [r (io/reader archivo :encoding "UTF-8")] (vec (line-seq r)))]
+       (assoc (en-transaccion #(cargar-lineas! % lineas (.getName archivo) fecha))
+              :archivo ruta)))))
 
-                            (not= 5 (count campos))
-                            {:error (str "se esperaban 5 campos y hay " (count campos))}
+(def ^:private archivo-semana-1
+  "Señales de la semana 1. Vienen en el expediente (enunciado, sección 4), así
+  que entran al crear la BD, como el manual. La semana 2 no: esa es el archivo
+  nuevo que se incorpora con `cargar` (sección 6). Bitácora D-025.
+  Se lee de data/, que está en el classpath (deps.edn)."
+  "senales_semana1.txt")
 
-                            (= "SENAL" tipo)
-                            (cargar-senal! c fuente-senal campos)
+(defn- cargar-senales-iniciales!
+  "Carga la semana 1 con la misma lógica de `cargar`, en la conexión con la que
+  se está creando la BD. La fecha es la del manual v0.7, porque llegaron con él.
+  Si el archivo trae una línea mala, la BD no se crea a medias: se lanza el error."
+  [^Connection c]
+  (let [lineas (with-open [r (io/reader (io/resource archivo-semana-1) :encoding "UTF-8")]
+                 (vec (line-seq r)))
+        fecha  (:fecha (first (consultar-en c "SELECT fecha FROM fuente
+                                               WHERE tipo = 'manual' ORDER BY id")))
+        r (transaccion-en c #(cargar-lineas! % lineas "senales_semana1.txt" fecha))]
+    (when (seq (:errores r))
+      (throw (ex-info "El archivo de señales de la semana 1 tiene líneas que no se entienden."
+                      {:fase :bd :tipo :senales-iniciales :detalle (:errores r)})))))
 
-                            :else
-                            (cargar-correccion! c fuente-corr fecha campos))]
-                    (assoc r :linea n)))
-                resultados (doall resultados)]
-            {:archivo      ruta
-             :version      version
-             :senales      (count (filter :senal resultados))
-             :correcciones (count (filter :correccion resultados))
-             :repetidas    (count (filter :repetida resultados))
-             :errores      (vec (for [r resultados :when (:error r)]
-                                  {:linea (:linea r) :motivo (:error r)}))})))))))
+;; ---------------------------------------------------------------------------
+;; Señales para el generador Ozh (PP-41, D-008, D-016)
+;; ---------------------------------------------------------------------------
+
+(defn senales
+  "Señales de una voz (:kethari u :ozh) que tienen transcripción, en orden de
+  día. Cada una es {:id :dia :voz :transcripcion :salida :fuente-id}.
+  El generador Ozh las usa para copiar la partícula de la señal más parecida
+  (D-008 en preguntas, D-016 en afirmaciones). Las de voz desconocida y las que
+  no tienen transcripción no sirven para eso y no se devuelven."
+  [voz]
+  (vec (consultar "SELECT id, dia, voz, transcripcion, salida, fuente_id FROM senal
+                   WHERE voz = ? AND transcripcion IS NOT NULL
+                   ORDER BY dia, id"
+                  (name voz))))
 
 ;; ---------------------------------------------------------------------------
 ;; Orden `palabra` (PP-33)
