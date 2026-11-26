@@ -26,27 +26,29 @@
     (spit f contenido :encoding "UTF-8")
     (.getPath f)))
 
-(deftest carga-las-dos-semanas
-  (let [s1 (bd/cargar-archivo! "data/senales_semana1.txt" "2026-11-21")
-        s2 (bd/cargar-archivo! "data/senales_semana2.txt" "2026-11-23")]
-    (testing "semana 1: 15 señales, manual 0.7"
-      (is (= {:archivo "data/senales_semana1.txt" :version "0.7" :senales 15
-              :correcciones 0 :repetidas 0 :errores []}
-             s1)))
-    (testing "semana 2: 6 señales y 1 corrección, manual 0.8"
-      (is (= {:archivo "data/senales_semana2.txt" :version "0.8" :senales 6
-              :correcciones 1 :repetidas 0 :errores []}
-             s2)))
-    (testing "quedan 21 señales (D-002)"
-      (is (= 21 (contar "senal"))))
-    (testing "la señal del día 6 sin transcripción queda guardada con transcripción vacía"
-      (is (= [{:transcripcion nil :salida "Ya los escuchamos."}]
-             (consultar "SELECT transcripcion, salida FROM senal WHERE voz = 'desconocida'"))))
-    (testing "cada carga queda con su fuente y su fecha"
-      (is (= [{:tipo "senal" :descripcion "Señales de senales_semana1.txt (manual 0.7)" :fecha "2026-11-21"}
-              {:tipo "senal" :descripcion "Señales de senales_semana2.txt (manual 0.8)" :fecha "2026-11-23"}
-              {:tipo "correccion" :descripcion "Correcciones de senales_semana2.txt (manual 0.8)" :fecha "2026-11-23"}]
-             (consultar "SELECT tipo, descripcion, fecha FROM fuente WHERE id > 8 ORDER BY id"))))))
+(deftest la-semana-1-viene-con-la-bd-y-la-semana-2-entra-con-cargar
+  (testing "al crear la BD ya están las 15 señales de la semana 1 (D-025)"
+    (is (= 15 (contar "senal")))
+    (is (= [{:tipo "senal" :descripcion "Señales de senales_semana1.txt (manual 0.7)" :fecha "2026-11-10"}]
+           (consultar "SELECT tipo, descripcion, fecha FROM fuente WHERE id > 8 ORDER BY id"))))
+  (testing "cargar la semana 1 otra vez no repite nada"
+    (is (= {:archivo "data/senales_semana1.txt" :version "0.7" :senales 0
+            :correcciones 0 :repetidas 15 :errores []}
+           (bd/cargar-archivo! "data/senales_semana1.txt" "2026-11-21"))))
+  (testing "semana 2: 6 señales y 1 corrección, manual 0.8"
+    (is (= {:archivo "data/senales_semana2.txt" :version "0.8" :senales 6
+            :correcciones 1 :repetidas 0 :errores []}
+           (bd/cargar-archivo! "data/senales_semana2.txt" "2026-11-23"))))
+  (testing "quedan 21 señales (D-002)"
+    (is (= 21 (contar "senal"))))
+  (testing "la señal del día 6 sin transcripción queda guardada con transcripción vacía"
+    (is (= [{:transcripcion nil :salida "Ya los escuchamos."}]
+           (consultar "SELECT transcripcion, salida FROM senal WHERE voz = 'desconocida'"))))
+  (testing "cada carga queda con su fuente y su fecha"
+    (is (= [{:tipo "senal" :descripcion "Señales de senales_semana1.txt (manual 0.7)" :fecha "2026-11-10"}
+            {:tipo "senal" :descripcion "Señales de senales_semana2.txt (manual 0.8)" :fecha "2026-11-23"}
+            {:tipo "correccion" :descripcion "Correcciones de senales_semana2.txt (manual 0.8)" :fecha "2026-11-23"}]
+           (consultar "SELECT tipo, descripcion, fecha FROM fuente WHERE id > 8 ORDER BY id")))))
 
 (deftest la-correccion-de-teka-d005
   (testing "antes de la semana 2, teka es tierra"
@@ -71,7 +73,7 @@
     (is (= 0 (:senales otra-vez)))
     (is (= 0 (:correcciones otra-vez)))
     (is (= 7 (:repetidas otra-vez)))
-    (is (= 6 (contar "senal")))
+    (is (= 21 (contar "senal")))
     (is (= 2 (:n (first (consultar "SELECT COUNT(*) AS n FROM palabra
                                     WHERE lengua = 'kethari' AND forma = 'teka'")))))))
 
