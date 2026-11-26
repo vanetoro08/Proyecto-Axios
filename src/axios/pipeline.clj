@@ -27,41 +27,47 @@
     {:texto texto :palabras palabras :valida? valida? :errores errores}))
 
 (defn- ejecutar-fases
-  "Corre todas las fases y va guardando la salida de cada una en el resultado
-  (eso es lo que muestra el modo traza)."
-  [resultado]
-  (let [normalizado (normalizador/normalizar (:original resultado))
-        tokens      (lexer/tokenizar (:texto normalizado))
+  "Corre todas las fases. Cada una deja su salida en `parcial` apenas termina,
+  así que si una fase falla, el resultado conserva lo que hicieron las
+  anteriores: eso lo muestra el modo traza (PP-35) y se guarda en el historial."
+  [parcial]
+  (let [anotar      (fn [clave valor] (vswap! parcial assoc clave valor) valor)
+        normalizado (anotar :normalizado (normalizador/normalizar (:original @parcial)))
+        tokens      (anotar :tokens-lexer (lexer/tokenizar (:texto normalizado)))
         corregido   (corrector/corregir tokens (bd/vocabulario-es))
-        analizados  (morfologia/analizar (:tokens corregido))
-        arbol       (parser/analizar analizados)
+        _           (anotar :correcciones (:correcciones corregido))
+        analizados  (anotar :tokens (morfologia/analizar (:tokens corregido)))
+        ;; Avisos de cómo se interpretó la pregunta: los de la morfología
+        ;; (D-015) y los del parser (D-006, D-010, D-017, D-023).
+        _           (anotar :avisos (vec (keep #(get-in % [:verbo :aviso]) analizados)))
+        arbol       (anotar :arbol (parser/analizar analizados))
+        _           (vswap! parcial update :avisos into (:avisos arbol))
         kethari     (traducir-y-validar gen-kethari/generar val-kethari/validar arbol)
+        _           (vswap! parcial assoc-in [:traducciones :kethari] kethari)
         ozh         (traducir-y-validar gen-ozh/generar val-ozh/validar arbol)
+        _           (vswap! parcial assoc-in [:traducciones :ozh] ozh)
         ambas-ok?   (and (:valida? kethari) (:valida? ozh))]
-    (assoc resultado
-           :normalizado  normalizado
-           :tokens       analizados
-           :correcciones (:correcciones corregido)
-           :arbol        arbol
-           :traducciones {:kethari kethari :ozh ozh}
-           :estado       (if ambas-ok? :aprobada :rechazada)
-           ;; Avisos de cómo se interpretó la pregunta: los de la morfología
-           ;; (D-015) y los del parser (D-006, D-010, D-017, D-023).
-           :avisos       (into (vec (keep #(get-in % [:verbo :aviso]) analizados))
-                               (:avisos arbol))
-           :explicacion  (when-not ambas-ok?
-                           "Una de las traducciones no pasó la validación; no se transmite ninguna."))))
+    (assoc @parcial
+           :estado      (if ambas-ok? :aprobada :rechazada)
+           :explicacion (when-not ambas-ok?
+                          (errores/explicar-rechazo-validadores kethari ozh)))))
 
 (defn traducir
-  "Traduce una pregunta en español a Kethari y Ozh y la registra SIEMPRE."
+  "Traduce una pregunta en español a Kethari y Ozh y la registra SIEMPRE,
+  también si una fase falla o si hay un error inesperado (condición 1)."
   [texto]
-  (let [base      {:fecha (util/ahora) :original texto :avisos []}
+  (let [parcial   (volatile! {:fecha (util/ahora) :original texto :avisos []})
+        rechazar  (fn [error mensaje]
+                    (assoc @parcial
+                           :estado      :rechazada
+                           :error       error
+                           :explicacion (errores/explicar error mensaje)))
         resultado (try
-                    (ejecutar-fases base)
+                    (ejecutar-fases parcial)
                     (catch clojure.lang.ExceptionInfo e
-                      (assoc base
-                             :estado      :rechazada
-                             :error       (ex-data e)
-                             :explicacion (errores/explicar (ex-data e) (ex-message e)))))
+                      (rechazar (ex-data e) (ex-message e)))
+                    (catch Exception e
+                      (let [error (errores/extraer-error e)]
+                        (rechazar error (:mensaje error)))))
         id        (bd/registrar-pregunta! resultado)]
     (assoc resultado :id id)))
