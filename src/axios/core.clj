@@ -8,8 +8,7 @@
     clojure -M:run historial [desde <fecha>]
     clojure -M:run palabra <término> [en <fecha>]"
   (:require [axios.bd :as bd]
-            [axios.pipeline :as pipeline]
-            [clojure.pprint :as pp])
+            [axios.pipeline :as pipeline])
   (:gen-class))
 
 (def ^:private uso
@@ -19,16 +18,119 @@
        "  historial [desde <fecha>]\n"
        "  palabra <término> [en <fecha>]"))
 
+;; ---------------------------------------------------------------------------
+;; Modo traza (PP-35): la salida de cada fase, en el orden del pipeline
+;; ---------------------------------------------------------------------------
+
+(def ^:private fase-numero
+  "En qué paso de la traza se detiene cada fase cuando falla."
+  {:normalizador 1 :lexer 2 :corrector 3 :morfologia 4 :parser 5
+   :generador 6 :validador-kethari 6 :validador-ozh 6 :pipeline 6})
+
+(defn- persona-texto [persona numero]
+  (str persona ".ª persona " (name numero)))
+
+(defn- frase-texto
+  "Una frase nominal del árbol, en palabras."
+  [f]
+  (case (:tipo f)
+    nil         "(ninguno)"
+    :pronombre  (str "pronombre de " (persona-texto (:persona f) (:numero f))
+                     (when (:inferido? f) " (deducido del verbo)"))
+    :sustantivo (str (name (:concepto f))
+                     (when (:plural? f) ", plural")
+                     (when (:cantidad f) (str ", cantidad " (:cantidad f)))
+                     (when-let [p (:poseedor f)]
+                       (str ", de la " (persona-texto (:persona p) (:numero p)))))))
+
+(defn- token-texto
+  "Lo que la morfología dijo de un token, en una línea."
+  [t]
+  (let [{:keys [categoria verbo concepto plural?]} t]
+    (cond
+      (= :numero (:tipo t)) (str "número " (:valor t))
+      (= :signo (:tipo t))  "signo"
+      (= :verbo categoria)  (str "verbo " (:infinitivo verbo) ", " (name (:tiempo verbo)) ", "
+                                 (persona-texto (:persona verbo) (:numero verbo))
+                                 (when (:perifrasis? verbo) " (ir a + infinitivo)")
+                                 (when-let [a (:alternativa verbo)]
+                                   (str " (también puede ser " (name (:tiempo a)) ", "
+                                        (persona-texto (:persona a) (:numero a)) ")")))
+      (= :sustantivo categoria) (str "sustantivo " (name concepto) (when plural? ", plural"))
+      (= :desconocida categoria) "palabra desconocida"
+      :else (str (name categoria) (when concepto (str " (" (name concepto) ")"))))))
+
+(defn- titulo [n texto]
+  (println (str "\n── " n ". " texto " ──")))
+
 (defn- mostrar-traza
-  "Muestra la salida de cada fase. TODO PP-35: presentación más clara."
-  [r]
-  (doseq [[titulo clave] [["Normalizador" :normalizado]
-                          ["Tokens (lexer + corrector + morfología)" :tokens]
-                          ["Correcciones" :correcciones]
-                          ["Árbol intermedio" :arbol]
-                          ["Traducciones y validación" :traducciones]]]
-    (println (str "\n── " titulo " ──"))
-    (pp/pprint (get r clave))))
+  "Muestra lo que hizo cada fase. Si una fase falló, lo dice y la traza se
+  detiene ahí; el resultado final y la explicación se muestran después."
+  [{:keys [original normalizado tokens-lexer correcciones tokens arbol traducciones error]}]
+  (let [detenida (when error (fase-numero (:fase error) 6))
+        mostrar? (fn [n] (or (nil? detenida) (<= n detenida)))
+        fallo    (fn [n]
+                   (when (= n detenida)
+                     (println (str "  ✗ La pregunta se detuvo aquí (" (name (:tipo error)) ")."))))]
+    (titulo 1 "Normalizador")
+    (println "  Entrada:  " original)
+    (when normalizado
+      (println "  Salida:   " (:texto normalizado))
+      (println "  Pregunta: " (if (:pregunta? normalizado) "sí" "no")))
+    (fallo 1)
+
+    (when (mostrar? 2)
+      (titulo 2 "Analizador léxico (AFD)")
+      (doseq [t tokens-lexer]
+        (println (format "  %-12s %-8s posición %d–%d"
+                         (:lexema t) (name (:tipo t)) (get-in t [:pos :inicio]) (get-in t [:pos :fin]))))
+      (fallo 2))
+
+    (when (mostrar? 3)
+      (titulo 3 "Corrector (Levenshtein)")
+      (if (empty? correcciones)
+        (println "  Sin correcciones.")
+        (doseq [{:keys [original corregida distancia]} correcciones]
+          (println (str "  " original " → " corregida " (distancia " distancia ")"))))
+      (fallo 3))
+
+    (when (mostrar? 4)
+      (titulo 4 "Morfología")
+      (doseq [t tokens :when (not= :signo (:tipo t))]
+        (println (format "  %-12s %s" (:lexema t) (token-texto t))))
+      (fallo 4))
+
+    (when (mostrar? 5)
+      (titulo 5 "Analizador sintáctico (árbol intermedio)")
+      (when arbol
+        (println "  Tipo:          " (name (:tipo arbol)))
+        (println "  Interrogativo: " (if-let [i (:interrogativo arbol)]
+                                       (str (name (:concepto i)) " (" (name (:rol i)) ")")
+                                       "(ninguno)"))
+        (println "  Sujeto:        " (frase-texto (:sujeto arbol)))
+        (let [v (:verbo arbol)]
+          (println "  Verbo:         " (str (name (:concepto v)) ", " (name (:tiempo v))
+                                            (when (:negado? v) ", negado"))))
+        (println "  Objeto:        " (frase-texto (:objeto arbol))))
+      (fallo 5))
+
+    (when (mostrar? 6)
+      (titulo 6 "Generadores y validadores")
+      (doseq [[lengua nombre] [[:kethari "Kethari"] [:ozh "Ozh"]]
+              :let [{:keys [texto palabras valida? errores]} (get traducciones lengua)]
+              :when texto]
+        (println (str "  " nombre ": " texto))
+        (println (str "    Palabras:  "
+                      (apply str (interpose ", " (for [p palabras]
+                                                   (str (:forma p)
+                                                        (when-let [c (:concepto p)] (str " (" (name c) ")"))
+                                                        " [fuente " (:fuente-id p) "]"))))))
+        (println (str "    Validador: " (if valida?
+                                           "la reconoce como válida"
+                                           (str "no la reconoce: "
+                                                (apply str (interpose "; " (map :mensaje errores))))))))
+      (fallo 6))
+    (println)))
 
 (defn- mostrar-resultado [r]
   (println "Pregunta:" (:original r))
